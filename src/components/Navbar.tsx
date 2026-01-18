@@ -3,10 +3,12 @@
 import { useState, useEffect } from 'react';
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
+import { useSession, signOut } from 'next-auth/react';
 
 export default function Navbar() {
     const [isDark, setIsDark] = useState(false);
     const pathname = usePathname();
+    const { data: session } = useSession();
 
     useEffect(() => {
         const savedTheme = localStorage.getItem('theme');
@@ -51,7 +53,7 @@ export default function Navbar() {
                             <Link
                                 key={link.href}
                                 href={link.href}
-                                className={`nav-link ${pathname === link.href ? 'active text-foreground' : ''}`}
+                                className={`nav-link text-sm ${pathname === link.href ? 'active text-foreground' : ''}`}
                             >
                                 {link.label}
                             </Link>
@@ -77,26 +79,27 @@ export default function Navbar() {
                             )}
                         </button>
 
-                        {/* Mobile Menu */}
-                        <div className="sm:hidden flex items-center gap-2">
-                            {navLinks.map(link => (
+                        {/* Auth Buttons */}
+                        {session ? (
+                            <div className="flex items-center gap-2">
                                 <Link
-                                    key={link.href}
-                                    href={link.href}
-                                    className={`text-sm px-3 py-1.5 rounded-lg ${pathname === link.href
-                                            ? 'bg-primary text-white'
-                                            : 'text-muted'
-                                        }`}
+                                    href="/dashboard"
+                                    className={`nav-link text-sm ${pathname === '/dashboard' ? 'active text-foreground' : ''}`}
                                 >
-                                    {link.label.split(' ')[0]}
+                                    Dashboard
                                 </Link>
-                            ))}
-                        </div>
-
-                        {/* Sign Up Button (desktop) */}
-                        <button className="hidden sm:block btn-primary text-sm py-2 px-4">
-                            Sign Up
-                        </button>
+                                <button
+                                    onClick={() => signOut({ callbackUrl: '/' })}
+                                    className="btn-secondary text-sm py-2 px-3"
+                                >
+                                    Logout
+                                </button>
+                            </div>
+                        ) : (
+                            <Link href="/login" className="btn-primary text-sm py-2 px-4">
+                                Sign In
+                            </Link>
+                        )}
                     </div>
                 </div>
             </div>

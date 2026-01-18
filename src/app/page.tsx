@@ -10,6 +10,8 @@ interface Appointment {
 	id: string;
 	date: string;
 	time: string;
+	endTime?: string;
+	title: string;
 	note: string;
 }
 
@@ -36,11 +38,13 @@ export default function Home() {
 		setIsModalOpen(true);
 	};
 
-	const handleSaveAppointment = (appointment: { id: string; date: Date; time: string; note: string }) => {
+	const handleSaveAppointment = (appointment: { id: string; date: Date; time: string; endTime?: string; title: string; note: string }) => {
 		const newAppointment: Appointment = {
 			id: appointment.id,
 			date: appointment.date.toISOString(),
 			time: appointment.time,
+			endTime: appointment.endTime,
+			title: appointment.title,
 			note: appointment.note
 		};
 		setAppointments(prev => [...prev, newAppointment]);
@@ -52,11 +56,12 @@ export default function Home() {
 
 	const eventDates = appointments.map(a => new Date(a.date));
 
-	const formatAppointmentDate = (dateStr: string, time: string) => {
+	const formatAppointmentDate = (dateStr: string, time: string, endTime?: string) => {
 		const date = new Date(dateStr);
 		const dayNames = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
 		const monthNames = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
-		return `${dayNames[date.getDay()]}, ${monthNames[date.getMonth()]} ${date.getDate()} at ${time}`;
+		const timeDisplay = endTime ? `${time} - ${endTime}` : time;
+		return `${dayNames[date.getDay()]}, ${monthNames[date.getMonth()]} ${date.getDate()} at ${timeDisplay}`;
 	};
 
 	return (
@@ -64,6 +69,15 @@ export default function Home() {
 
 			{/* Main Content */}
 			<main className="max-w-6xl mx-auto">
+				{/* Hero Section */}
+				<div className="text-center mb-8">
+					<h1 className="text-3xl font-bold text-foreground mb-3">Schedule Your Day</h1>
+					<p className="text-muted max-w-2xl mx-auto">
+						Calendly helps you manage your appointments effortlessly. Click on any date to create
+						an appointment, set a time or time range, and export directly to Google or Apple Calendar.
+					</p>
+				</div>
+
 				<div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
 					{/* Calendar Section */}
 					<div className="lg:col-span-2 flex justify-center lg:justify-start">
@@ -96,12 +110,17 @@ export default function Home() {
 										<div key={apt.id} className="bg-secondary rounded-xl p-4 group">
 											<div className="flex items-start justify-between gap-2">
 												<div className="flex-1 min-w-0">
-													<div className="text-xs text-accent mb-1">
-														{formatAppointmentDate(apt.date, apt.time)}
+													<div className="font-medium text-foreground">
+														{apt.title}
 													</div>
-													<div className="text-sm text-foreground truncate">
-														{apt.note || 'No description'}
+													<div className="text-xs text-primary mb-1">
+														{formatAppointmentDate(apt.date, apt.time, apt.endTime)}
 													</div>
+													{apt.note && (
+														<div className="text-xs text-muted truncate">
+															{apt.note}
+														</div>
+													)}
 												</div>
 												<button
 													onClick={() => handleDeleteAppointment(apt.id)}

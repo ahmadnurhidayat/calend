@@ -1,52 +1,139 @@
-import Image from "next/image";
+'use client';
+
+import { useState, useEffect } from 'react';
+import Calendar from '@/components/Calendar';
+import NextDayInfo from '@/components/NextDayInfo';
+import AppointmentModal from '@/components/AppointmentModal';
+import DateCalculator from '@/components/DateCalculator';
+
+interface Appointment {
+	id: string;
+	date: string;
+	time: string;
+	note: string;
+}
 
 export default function Home() {
-	return (
-		<div className="font-sans grid grid-rows-[20px_1fr_20px] items-center justify-items-center min-h-screen p-8 pb-20 gap-16 sm:p-20">
-			<main className="flex flex-col gap-[32px] row-start-2 items-center sm:items-start">
-				<Image className="dark:invert" src="/next.svg" alt="Next.js logo" width={180} height={38} priority />
-				<ol className="font-mono list-inside list-decimal text-sm/6 text-center sm:text-left">
-					<li className="mb-2 tracking-[-.01em]">
-						Get started by editing{" "}
-						<code className="bg-black/[.05] dark:bg-white/[.06] font-mono font-semibold px-1 py-0.5 rounded">
-							src/app/page.tsx
-						</code>
-						.
-					</li>
-					<li className="tracking-[-.01em]">Save and see your changes instantly.</li>
-				</ol>
+	const [selectedDate, setSelectedDate] = useState<Date | null>(null);
+	const [isModalOpen, setIsModalOpen] = useState(false);
+	const [appointments, setAppointments] = useState<Appointment[]>([]);
 
-				<div className="flex gap-4 items-center flex-col sm:flex-row">
-					<a
-						className="rounded-full border border-solid border-black/[.08] dark:border-white/[.145] transition-colors flex items-center justify-center hover:bg-[#f2f2f2] dark:hover:bg-[#1a1a1a] hover:border-transparent font-medium text-sm sm:text-base h-10 sm:h-12 px-4 sm:px-5 w-full sm:w-auto md:w-[158px]"
-						href="https://nextjs.org/docs?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-						target="_blank"
-						rel="noopener noreferrer"
-					>
-						Read our docs
-					</a>
+	// Load appointments from localStorage on mount
+	useEffect(() => {
+		const saved = localStorage.getItem('calendly-appointments');
+		if (saved) {
+			setAppointments(JSON.parse(saved));
+		}
+	}, []);
+
+	// Save appointments to localStorage
+	useEffect(() => {
+		localStorage.setItem('calendly-appointments', JSON.stringify(appointments));
+	}, [appointments]);
+
+	const handleDateSelect = (date: Date) => {
+		setSelectedDate(date);
+		setIsModalOpen(true);
+	};
+
+	const handleSaveAppointment = (appointment: { id: string; date: Date; time: string; note: string }) => {
+		const newAppointment: Appointment = {
+			id: appointment.id,
+			date: appointment.date.toISOString(),
+			time: appointment.time,
+			note: appointment.note
+		};
+		setAppointments(prev => [...prev, newAppointment]);
+	};
+
+	const handleDeleteAppointment = (id: string) => {
+		setAppointments(prev => prev.filter(a => a.id !== id));
+	};
+
+	const eventDates = appointments.map(a => new Date(a.date));
+
+	const formatAppointmentDate = (dateStr: string, time: string) => {
+		const date = new Date(dateStr);
+		const dayNames = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
+		const monthNames = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
+		return `${dayNames[date.getDay()]}, ${monthNames[date.getMonth()]} ${date.getDate()} at ${time}`;
+	};
+
+	return (
+		<div className="min-h-screen p-4 sm:p-8">
+
+			{/* Main Content */}
+			<main className="max-w-6xl mx-auto">
+				<div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+					{/* Calendar Section */}
+					<div className="lg:col-span-2 flex justify-center lg:justify-start">
+						<Calendar
+							selectedDate={selectedDate}
+							onDateSelect={handleDateSelect}
+							eventDates={eventDates}
+						/>
+					</div>
+
+					{/* Sidebar */}
+					<div className="space-y-6">
+						{/* Next Day Info */}
+						<NextDayInfo />
+
+						{/* Upcoming Appointments */}
+						<div className="glass-card p-6">
+							<h3 className="text-lg font-semibold mb-4 flex items-center gap-2">
+								<svg className="w-5 h-5 text-primary" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+									<path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2" />
+								</svg>
+								Appointments
+							</h3>
+
+							{appointments.length === 0 ? (
+								<p className="text-muted text-sm">No appointments yet. Click on a date to create one.</p>
+							) : (
+								<div className="space-y-3 max-h-64 overflow-y-auto">
+									{appointments.slice().reverse().map(apt => (
+										<div key={apt.id} className="bg-secondary rounded-xl p-4 group">
+											<div className="flex items-start justify-between gap-2">
+												<div className="flex-1 min-w-0">
+													<div className="text-xs text-accent mb-1">
+														{formatAppointmentDate(apt.date, apt.time)}
+													</div>
+													<div className="text-sm text-foreground truncate">
+														{apt.note || 'No description'}
+													</div>
+												</div>
+												<button
+													onClick={() => handleDeleteAppointment(apt.id)}
+													className="p-1 rounded opacity-0 group-hover:opacity-100 hover:bg-glass transition-all text-muted hover:text-red-400"
+													aria-label="Delete appointment"
+												>
+													<svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+														<path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
+													</svg>
+												</button>
+											</div>
+										</div>
+									))}
+								</div>
+							)}
+						</div>
+					</div>
 				</div>
 			</main>
-			<footer className="row-start-3 flex gap-[24px] flex-wrap items-center justify-center">
-				<a
-					className="flex items-center gap-2 hover:underline hover:underline-offset-4"
-					href="https://nextjs.org/learn?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-					target="_blank"
-					rel="noopener noreferrer"
-				>
-					<Image aria-hidden src="/file.svg" alt="File icon" width={16} height={16} />
-					Learn
-				</a>
-				<a
-					className="flex items-center gap-2 hover:underline hover:underline-offset-4"
-					href="https://nextjs.org?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-					target="_blank"
-					rel="noopener noreferrer"
-				>
-					<Image aria-hidden src="/globe.svg" alt="Globe icon" width={16} height={16} />
-					Go to nextjs.org →
-				</a>
-			</footer>
+
+			{/* Date Calculator Section - Separate from main calendar */}
+			<section className="max-w-3xl mx-auto mt-12 mb-8">
+				<DateCalculator />
+			</section>
+
+			{/* Appointment Modal */}
+			<AppointmentModal
+				isOpen={isModalOpen}
+				selectedDate={selectedDate}
+				onClose={() => setIsModalOpen(false)}
+				onSave={handleSaveAppointment}
+			/>
 		</div>
 	);
 }

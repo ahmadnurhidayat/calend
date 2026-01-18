@@ -1,26 +1,164 @@
 @import "tailwindcss";
 
 :root {
-	--background: #ffffff;
-	--foreground: #171717;
+	/* Finpay Theme - Light Mode */
+	--background: #F7F7F7;
+	--foreground: #1A1A1A;
+	--primary: #1A5D5C;
+	--primary-hover: #0D4A49;
+	--secondary: #FFFFFF;
+	--accent: #1A5D5C;
+	--border: #E5E5E5;
+	--muted: #6B7280;
+	--card: #FFFFFF;
+}
+
+.dark {
+	/* Dark Mode */
+	--background: #0F1419;
+	--foreground: #F7F7F7;
+	--primary: #2DD4BF;
+	--primary-hover: #14B8A6;
+	--secondary: #1E2328;
+	--accent: #2DD4BF;
+	--border: #2D3640;
+	--muted: #9CA3AF;
+	--card: #1E2328;
 }
 
 @theme inline {
 	--color-background: var(--background);
 	--color-foreground: var(--foreground);
+	--color-primary: var(--primary);
+	--color-primary-hover: var(--primary-hover);
+	--color-secondary: var(--secondary);
+	--color-accent: var(--accent);
+	--color-border: var(--border);
+	--color-muted: var(--muted);
+	--color-card: var(--card);
 	--font-sans: var(--font-geist-sans);
 	--font-mono: var(--font-geist-mono);
-}
-
-@media (prefers-color-scheme: dark) {
-	:root {
-		--background: #0a0a0a;
-		--foreground: #ededed;
-	}
 }
 
 body {
 	background: var(--background);
 	color: var(--foreground);
 	font-family: Arial, Helvetica, sans-serif;
+	min-height: 100vh;
+	transition: background-color 0.3s ease, color 0.3s ease;
+}
+
+/* Card styling */
+.glass-card {
+	background: var(--card);
+	border: 1px solid var(--border);
+	border-radius: 16px;
+	box-shadow: 0 1px 3px rgba(0, 0, 0, 0.05);
+}
+
+/* Primary Button */
+.btn-primary {
+	background: var(--primary);
+	color: white;
+	padding: 0.75rem 1.5rem;
+	border-radius: 8px;
+	font-weight: 600;
+	transition: all 0.2s ease;
+}
+
+.btn-primary:hover {
+	background: var(--primary-hover);
+}
+
+/* Secondary Button (outline) */
+.btn-secondary {
+	background: transparent;
+	color: var(--foreground);
+	padding: 0.625rem 1.25rem;
+	border-radius: 8px;
+	border: 1px solid var(--border);
+	font-weight: 500;
+	transition: all 0.2s ease;
+}
+
+.btn-secondary:hover {
+	border-color: var(--primary);
+	color: var(--primary);
+}
+
+/* Calendar cell */
+.calendar-day {
+	aspect-ratio: 1;
+	display: flex;
+	align-items: center;
+	justify-content: center;
+	border-radius: 8px;
+	cursor: pointer;
+	transition: all 0.2s ease;
+	font-weight: 500;
+}
+
+.calendar-day:hover {
+	background: var(--primary);
+	color: white;
+}
+
+.calendar-day.selected {
+	background: var(--primary);
+	color: white;
+}
+
+.calendar-day.today {
+	border: 2px solid var(--primary);
+	color: var(--primary);
+}
+
+.calendar-day.has-event::after {
+	content: '';
+	position: absolute;
+	bottom: 4px;
+	width: 6px;
+	height: 6px;
+	background: var(--primary);
+	border-radius: 50%;
+}
+
+/* Modal backdrop */
+.modal-backdrop {
+	background: rgba(0, 0, 0, 0.5);
+	backdrop-filter: blur(4px);
+}
+
+/* Input styling */
+.input-field {
+	background: var(--secondary);
+	border: 1px solid var(--border);
+	border-radius: 8px;
+	padding: 0.75rem 1rem;
+	color: var(--foreground);
+	transition: all 0.2s ease;
+}
+
+.input-field:focus {
+	outline: none;
+	border-color: var(--primary);
+	box-shadow: 0 0 0 3px rgba(26, 93, 92, 0.1);
+}
+
+/* Nav link */
+.nav-link {
+	color: var(--muted);
+	padding: 0.5rem 1rem;
+	font-weight: 500;
+	font-size: 0.875rem;
+	transition: all 0.2s ease;
+}
+
+.nav-link:hover, .nav-link.active {
+	color: var(--foreground);
+}
+
+/* Smooth transitions */
+html {
+	scroll-behavior: smooth;
 }

@@ -11,6 +11,7 @@ export interface User {
     email: string;
     name: string;
     username: string;
+    password_hash?: string;
     google_access_token?: string;
     google_refresh_token?: string;
     created_at: string;

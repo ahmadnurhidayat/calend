@@ -2,7 +2,7 @@
 
 import { useSession, signOut } from 'next-auth/react';
 import { useRouter } from 'next/navigation';
-import { useEffect, useState } from 'react';
+import { useEffect, useState, useCallback } from 'react';
 import { supabase, Availability, Booking } from '@/lib/supabase';
 
 export default function DashboardPage() {
@@ -12,6 +12,36 @@ export default function DashboardPage() {
     const [bookings, setBookings] = useState<Booking[]>([]);
     const [username, setUsername] = useState('');
     const [copied, setCopied] = useState(false);
+
+    const loadUserData = useCallback(async () => {
+        const { data: user } = await supabase
+            .from('users')
+            .select('username')
+            .eq('email', session?.user?.email)
+            .single();
+
+        if (user) {
+            setUsername(user.username);
+        }
+
+        const { data: bookingsData } = await supabase
+            .from('bookings')
+            .select('*')
+            .order('date', { ascending: true });
+
+        if (bookingsData) {
+            setBookings(bookingsData);
+        }
+
+        const { data: availData } = await supabase
+            .from('availability')
+            .select('*')
+            .order('day_of_week', { ascending: true });
+
+        if (availData) {
+            setAvailability(availData);
+        }
+    }, [session?.user?.email]);
 
     useEffect(() => {
         if (status === 'unauthenticated') {
@@ -23,39 +53,7 @@ export default function DashboardPage() {
         if (session?.user?.email) {
             loadUserData();
         }
-    }, [session]);
-
-    const loadUserData = async () => {
-        const { data: user } = await supabase
-            .from('users')
-            .select('username')
-            .eq('email', session?.user?.email)
-            .single();
-
-        if (user) {
-            setUsername(user.username);
-        }
-
-        // Load bookings
-        const { data: bookingsData } = await supabase
-            .from('bookings')
-            .select('*')
-            .order('date', { ascending: true });
-
-        if (bookingsData) {
-            setBookings(bookingsData);
-        }
-
-        // Load availability
-        const { data: availData } = await supabase
-            .from('availability')
-            .select('*')
-            .order('day_of_week', { ascending: true });
-
-        if (availData) {
-            setAvailability(availData);
-        }
-    };
+    }, [session, loadUserData]);
 
     const copyBookingLink = () => {
         const link = `${window.location.origin}/book/${username}`;
@@ -68,16 +66,15 @@ export default function DashboardPage() {
 
     if (status === 'loading') {
         return (
-            <div className="min-h-screen flex items-center justify-center">
+            <div className="flex-1 flex items-center justify-center">
                 <div className="text-muted">Loading...</div>
             </div>
         );
     }
 
     return (
-        <div className="min-h-screen p-4 sm:p-8">
+        <div className="p-4 sm:p-8">
             <div className="max-w-4xl mx-auto">
-                {/* Header */}
                 <div className="flex items-center justify-between mb-8">
                     <div>
                         <h1 className="text-2xl font-bold text-foreground">Dashboard</h1>
@@ -91,7 +88,6 @@ export default function DashboardPage() {
                     </button>
                 </div>
 
-                {/* Booking Link */}
                 <div className="glass-card p-6 mb-6">
                     <h2 className="font-semibold text-foreground mb-3">Your Booking Link</h2>
                     <div className="flex items-center gap-3">
@@ -114,7 +110,6 @@ export default function DashboardPage() {
                 </div>
 
                 <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-                    {/* Upcoming Bookings */}
                     <div className="glass-card p-6">
                         <h2 className="font-semibold text-foreground mb-4">Upcoming Bookings</h2>
                         {bookings.length === 0 ? (
@@ -137,7 +132,6 @@ export default function DashboardPage() {
                         )}
                     </div>
 
-                    {/* Availability */}
                     <div className="glass-card p-6">
                         <h2 className="font-semibold text-foreground mb-4">Your Availability</h2>
                         {availability.length === 0 ? (

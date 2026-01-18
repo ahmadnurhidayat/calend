@@ -2,7 +2,7 @@
 
 import { useSession } from 'next-auth/react';
 import { useRouter } from 'next/navigation';
-import { useEffect, useState } from 'react';
+import { useEffect, useState, useCallback } from 'react';
 import { supabase } from '@/lib/supabase';
 
 interface DayAvailability {
@@ -25,25 +25,13 @@ export default function AvailabilityPage() {
         dayNames.map((name, i) => ({
             day: i,
             name,
-            isActive: i >= 1 && i <= 5, // Mon-Fri default
+            isActive: i >= 1 && i <= 5,
             startTime: '09:00',
             endTime: '17:00',
         }))
     );
 
-    useEffect(() => {
-        if (status === 'unauthenticated') {
-            router.push('/login');
-        }
-    }, [status, router]);
-
-    useEffect(() => {
-        if (session?.user?.email) {
-            loadAvailability();
-        }
-    }, [session]);
-
-    const loadAvailability = async () => {
+    const loadAvailability = useCallback(async () => {
         const { data: user } = await supabase
             .from('users')
             .select('id')
@@ -60,7 +48,7 @@ export default function AvailabilityPage() {
         if (data && data.length > 0) {
             setAvailability(prev =>
                 prev.map(day => {
-                    const saved = data.find(d => d.day_of_week === day.day);
+                    const saved = data.find((d: { day_of_week: number }) => d.day_of_week === day.day);
                     if (saved) {
                         return {
                             ...day,
@@ -73,7 +61,19 @@ export default function AvailabilityPage() {
                 })
             );
         }
-    };
+    }, [session?.user?.email]);
+
+    useEffect(() => {
+        if (status === 'unauthenticated') {
+            router.push('/login');
+        }
+    }, [status, router]);
+
+    useEffect(() => {
+        if (session?.user?.email) {
+            loadAvailability();
+        }
+    }, [session, loadAvailability]);
 
     const handleSave = async () => {
         setSaving(true);
@@ -89,10 +89,8 @@ export default function AvailabilityPage() {
             return;
         }
 
-        // Delete existing availability
         await supabase.from('availability').delete().eq('user_id', user.id);
 
-        // Insert new availability
         const records = availability.map(day => ({
             user_id: user.id,
             day_of_week: day.day,
@@ -124,7 +122,7 @@ export default function AvailabilityPage() {
         );
     };
 
-    const timeSlots = [];
+    const timeSlots: string[] = [];
     for (let h = 0; h < 24; h++) {
         for (let m = 0; m < 60; m += 30) {
             timeSlots.push(`${h.toString().padStart(2, '0')}:${m.toString().padStart(2, '0')}`);
@@ -133,14 +131,14 @@ export default function AvailabilityPage() {
 
     if (status === 'loading') {
         return (
-            <div className="min-h-screen flex items-center justify-center">
+            <div className="flex-1 flex items-center justify-center">
                 <div className="text-muted">Loading...</div>
             </div>
         );
     }
 
     return (
-        <div className="min-h-screen p-4 sm:p-8">
+        <div className="p-4 sm:p-8">
             <div className="max-w-2xl mx-auto">
                 <div className="flex items-center justify-between mb-8">
                     <div>

@@ -1,6 +1,8 @@
-import NextAuth, { NextAuthOptions } from 'next-auth';
 import GoogleProvider from 'next-auth/providers/google';
+import CredentialsProvider from 'next-auth/providers/credentials';
 import { supabase } from '@/lib/supabase';
+import { compare } from 'bcryptjs';
+import type { NextAuthOptions } from 'next-auth';
 
 export const authOptions: NextAuthOptions = {
     providers: [
@@ -15,11 +17,43 @@ export const authOptions: NextAuthOptions = {
                 },
             },
         }),
+        CredentialsProvider({
+            name: 'credentials',
+            credentials: {
+                email: { label: 'Email', type: 'email' },
+                password: { label: 'Password', type: 'password' },
+            },
+            async authorize(credentials) {
+                if (!credentials?.email || !credentials?.password) {
+                    throw new Error('Email and password required');
+                }
+
+                const { data: user } = await supabase
+                    .from('users')
+                    .select('*')
+                    .eq('email', credentials.email)
+                    .single();
+
+                if (!user || !user.password_hash) {
+                    throw new Error('Invalid email or password');
+                }
+
+                const isValid = await compare(credentials.password, user.password_hash);
+                if (!isValid) {
+                    throw new Error('Invalid email or password');
+                }
+
+                return {
+                    id: user.id,
+                    email: user.email,
+                    name: user.name,
+                };
+            },
+        }),
     ],
     callbacks: {
         async signIn({ user, account }) {
             if (account?.provider === 'google' && user.email) {
-                // Check if user exists
                 const { data: existingUser } = await supabase
                     .from('users')
                     .select('*')
@@ -27,7 +61,6 @@ export const authOptions: NextAuthOptions = {
                     .single();
 
                 if (existingUser) {
-                    // Update tokens
                     await supabase
                         .from('users')
                         .update({
@@ -36,7 +69,6 @@ export const authOptions: NextAuthOptions = {
                         })
                         .eq('email', user.email);
                 } else {
-                    // Create new user
                     const username = user.email.split('@')[0].replace(/[^a-zA-Z0-9]/g, '');
                     await supabase.from('users').insert({
                         id: user.id,
@@ -67,6 +99,9 @@ export const authOptions: NextAuthOptions = {
             }
             return session;
         },
+    },
+    session: {
+        strategy: 'jwt',
     },
     pages: {
         signIn: '/login',

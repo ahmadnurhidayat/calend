@@ -2,14 +2,38 @@ import { NextRequest, NextResponse } from 'next/server';
 import { supabase } from '@/lib/supabase';
 import { createCalendarEvent } from '@/lib/google-calendar';
 
+interface BookingRequest {
+    userId: string;
+    date: string;
+    startTime: string;
+    endTime: string;
+    candidateName: string;
+    candidateEmail: string;
+    reason?: string;
+}
+
+const BOOKING_LIMIT_PER_USER = 15;
+
 export async function POST(request: NextRequest) {
     try {
-        const body = await request.json();
+        const body = await request.json() as BookingRequest;
         const { userId, date, startTime, endTime, candidateName, candidateEmail, reason } = body;
 
         // Validate required fields
         if (!userId || !date || !startTime || !endTime || !candidateName || !candidateEmail) {
             return NextResponse.json({ error: 'Missing required fields' }, { status: 400 });
+        }
+
+        // Check rate limit - max 15 bookings per user
+        const { count: bookingCount } = await supabase
+            .from('bookings')
+            .select('*', { count: 'exact', head: true })
+            .eq('user_id', userId);
+
+        if (bookingCount !== null && bookingCount >= BOOKING_LIMIT_PER_USER) {
+            return NextResponse.json({
+                error: `This recruiter has reached the maximum limit of ${BOOKING_LIMIT_PER_USER} appointments.`
+            }, { status: 429 });
         }
 
         // Check if slot is still available
@@ -65,7 +89,7 @@ export async function POST(request: NextRequest) {
                 candidate_name: candidateName,
                 candidate_email: candidateEmail,
                 reason,
-                google_event_id: googleEventId,
+                google_event_id: googleEventId ?? undefined,
             })
             .select()
             .single();

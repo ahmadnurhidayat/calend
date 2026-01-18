@@ -65,7 +65,7 @@ export default function Home() {
 	};
 
 	return (
-		<div className="min-h-screen p-4 sm:p-8">
+		<div className="p-4 sm:p-8">
 
 			{/* Main Content */}
 			<main className="max-w-6xl mx-auto">

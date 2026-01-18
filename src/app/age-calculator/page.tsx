@@ -97,7 +97,7 @@ export default function AgeCalculatorPage() {
     };
 
     return (
-        <div className="min-h-screen p-4 sm:p-8">
+        <div className="p-4 sm:p-8">
             <div className="max-w-3xl mx-auto">
                 {/* Header */}
                 <div className="text-center mb-8">

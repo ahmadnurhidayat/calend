@@ -10,7 +10,7 @@ export async function createCalendarEvent(
         endTime: Date;
         attendeeEmail: string;
     }
-) {
+): Promise<string> {
     // Get user's tokens from database
     const { data: user, error } = await supabase
         .from('users')
@@ -61,5 +61,6 @@ export async function createCalendarEvent(
         sendUpdates: 'all',
     });
 
-    return calendarEvent.data.id;
+    return calendarEvent.data.id || '';
 }
+

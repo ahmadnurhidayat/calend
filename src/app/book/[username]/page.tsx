@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect, use } from 'react';
+import { useState, useEffect, use, useCallback } from 'react';
 import { supabase, User, Availability, Booking } from '@/lib/supabase';
 
 interface TimeSlot {
@@ -23,11 +23,7 @@ export default function BookingPage({ params }: { params: Promise<{ username: st
     const [success, setSuccess] = useState(false);
     const [error, setError] = useState('');
 
-    useEffect(() => {
-        loadRecruiterData();
-    }, [username]);
-
-    const loadRecruiterData = async () => {
+    const loadRecruiterData = useCallback(async () => {
         const { data: user } = await supabase
             .from('users')
             .select('*')
@@ -61,7 +57,11 @@ export default function BookingPage({ params }: { params: Promise<{ username: st
         }
 
         setLoading(false);
-    };
+    }, [username]);
+
+    useEffect(() => {
+        loadRecruiterData();
+    }, [loadRecruiterData]);
 
     const getAvailableSlots = (date: Date): TimeSlot[] => {
         const dayOfWeek = date.getDay();
@@ -121,7 +121,7 @@ export default function BookingPage({ params }: { params: Promise<{ username: st
             if (response.ok) {
                 setSuccess(true);
             } else {
-                const data = await response.json();
+                const data = await response.json() as { error?: string };
                 setError(data.error || 'Failed to book appointment');
             }
         } catch {
@@ -155,7 +155,7 @@ export default function BookingPage({ params }: { params: Promise<{ username: st
 
     if (loading) {
         return (
-            <div className="min-h-screen flex items-center justify-center">
+            <div className="flex-1 flex items-center justify-center">
                 <div className="text-muted">Loading...</div>
             </div>
         );
@@ -163,7 +163,7 @@ export default function BookingPage({ params }: { params: Promise<{ username: st
 
     if (!recruiter) {
         return (
-            <div className="min-h-screen flex items-center justify-center p-4">
+            <div className="flex-1 flex items-center justify-center p-4">
                 <div className="text-center">
                     <h1 className="text-2xl font-bold text-foreground mb-2">User Not Found</h1>
                     <p className="text-muted">The booking link you followed is invalid.</p>
@@ -174,7 +174,7 @@ export default function BookingPage({ params }: { params: Promise<{ username: st
 
     if (success) {
         return (
-            <div className="min-h-screen flex items-center justify-center p-4">
+            <div className="flex-1 flex items-center justify-center p-4">
                 <div className="glass-card p-8 max-w-md text-center">
                     <div className="w-16 h-16 rounded-full bg-green-500 flex items-center justify-center mx-auto mb-4">
                         <svg className="w-8 h-8 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -194,7 +194,7 @@ export default function BookingPage({ params }: { params: Promise<{ username: st
     }
 
     return (
-        <div className="min-h-screen p-4 sm:p-8">
+        <div className="p-4 sm:p-8">
             <div className="max-w-2xl mx-auto">
                 {/* Header */}
                 <div className="text-center mb-8">
@@ -217,10 +217,10 @@ export default function BookingPage({ params }: { params: Promise<{ username: st
                                     onClick={() => { setSelectedDate(date); setSelectedTime(''); }}
                                     disabled={!hasSlots}
                                     className={`flex-shrink-0 p-3 rounded-xl text-center transition-all ${isSelected
-                                            ? 'bg-primary text-white'
-                                            : hasSlots
-                                                ? 'bg-secondary hover:bg-primary/20'
-                                                : 'opacity-50 cursor-not-allowed'
+                                        ? 'bg-primary text-white'
+                                        : hasSlots
+                                            ? 'bg-secondary hover:bg-primary/20'
+                                            : 'opacity-50 cursor-not-allowed'
                                         }`}
                                 >
                                     <div className="text-xs">{dayNames[date.getDay()]}</div>
@@ -243,10 +243,10 @@ export default function BookingPage({ params }: { params: Promise<{ username: st
                                     onClick={() => setSelectedTime(slot.time)}
                                     disabled={!slot.available}
                                     className={`p-2 rounded-lg text-sm font-medium transition-all ${selectedTime === slot.time
-                                            ? 'bg-primary text-white'
-                                            : slot.available
-                                                ? 'bg-secondary hover:bg-primary/20'
-                                                : 'opacity-50 cursor-not-allowed line-through'
+                                        ? 'bg-primary text-white'
+                                        : slot.available
+                                            ? 'bg-secondary hover:bg-primary/20'
+                                            : 'opacity-50 cursor-not-allowed line-through'
                                         }`}
                                 >
                                     {slot.time}

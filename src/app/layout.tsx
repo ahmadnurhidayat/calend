@@ -26,14 +26,14 @@ export default function RootLayout({
 	children: React.ReactNode;
 }>) {
 	return (
-		<html lang="en">
+		<html lang="en" className="h-full">
 			<head>
 				<link rel="icon" href="/favicon.svg" type="image/svg+xml"></link>
 			</head>
-			<body className={`${geistSans.variable} ${geistMono.variable} antialiased min-h-screen flex flex-col pb-14`}>
+			<body className={`${geistSans.variable} ${geistMono.variable} antialiased h-full flex flex-col`}>
 				<Providers>
 					<Navbar />
-					<main className="flex-1">{children}</main>
+					<main className="flex-1 overflow-y-auto pb-14">{children}</main>
 					<Footer />
 				</Providers>
 			</body>

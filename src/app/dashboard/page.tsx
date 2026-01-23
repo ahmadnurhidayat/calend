@@ -16,7 +16,7 @@ export default function DashboardPage() {
     const loadUserData = useCallback(async () => {
         const { data: user } = await supabase
             .from('users')
-            .select('username')
+            .select('id, username')
             .eq('email', session?.user?.email)
             .single();
 
@@ -24,22 +24,27 @@ export default function DashboardPage() {
             setUsername(user.username);
         }
 
-        const { data: bookingsData } = await supabase
-            .from('bookings')
-            .select('*')
-            .order('date', { ascending: true });
+        // Only fetch bookings and availability for the current user
+        if (user?.id) {
+            const { data: bookingsData } = await supabase
+                .from('bookings')
+                .select('*')
+                .eq('user_id', user.id)
+                .order('date', { ascending: true });
 
-        if (bookingsData) {
-            setBookings(bookingsData);
-        }
+            if (bookingsData) {
+                setBookings(bookingsData);
+            }
 
-        const { data: availData } = await supabase
-            .from('availability')
-            .select('*')
-            .order('day_of_week', { ascending: true });
+            const { data: availData } = await supabase
+                .from('availability')
+                .select('*')
+                .eq('user_id', user.id)
+                .order('day_of_week', { ascending: true });
 
-        if (availData) {
-            setAvailability(availData);
+            if (availData) {
+                setAvailability(availData);
+            }
         }
     }, [session?.user?.email]);
 

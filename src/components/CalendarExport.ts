@@ -8,11 +8,11 @@ export function generateICS(
         return date.toISOString().replace(/[-:]/g, '').split('.')[0] + 'Z';
     };
 
-    const uid = `${Date.now()}-${Math.random().toString(36).substr(2, 9)}@calendly`;
+    const uid = `${Date.now()}-${Math.random().toString(36).substr(2, 9)}@calend`;
 
     return `BEGIN:VCALENDAR
 VERSION:2.0
-PRODID:-//Calendly//Appointment//EN
+PRODID:-//Calend//Appointment//EN
 CALSCALE:GREGORIAN
 METHOD:PUBLISH
 BEGIN:VEVENT

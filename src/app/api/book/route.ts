@@ -68,7 +68,7 @@ export async function POST(request: NextRequest) {
 
             googleEventId = await createCalendarEvent(userId, {
                 title: `Meeting with ${candidateName}`,
-                description: reason || `Scheduled via Calendly\n\nCandidate: ${candidateName}\nEmail: ${candidateEmail}`,
+                description: reason || `Scheduled via Calend\n\nCandidate: ${candidateName}\nEmail: ${candidateEmail}`,
                 startTime: startDate,
                 endTime: endDate,
                 attendeeEmail: candidateEmail,

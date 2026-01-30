@@ -16,7 +16,7 @@ const geistMono = Geist_Mono({
 });
 
 export const metadata: Metadata = {
-	title: "Calendly - Calendar & Date Tools",
+	title: "Calend - Calendar & Date Tools",
 	description: "A modern calendar app with appointment scheduling, date calculator, and age calculator",
 };
 

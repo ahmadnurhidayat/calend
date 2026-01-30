@@ -22,7 +22,7 @@ export default function Home() {
 
 	// Load appointments from localStorage on mount
 	useEffect(() => {
-		const saved = localStorage.getItem('calendly-appointments');
+		const saved = localStorage.getItem('calend-appointments');
 		if (saved) {
 			setAppointments(JSON.parse(saved));
 		}
@@ -30,7 +30,7 @@ export default function Home() {
 
 	// Save appointments to localStorage
 	useEffect(() => {
-		localStorage.setItem('calendly-appointments', JSON.stringify(appointments));
+		localStorage.setItem('calend-appointments', JSON.stringify(appointments));
 	}, [appointments]);
 
 	const handleDateSelect = (date: Date) => {
@@ -73,7 +73,7 @@ export default function Home() {
 				<div className="text-center mb-8">
 					<h1 className="text-3xl font-bold text-foreground mb-3">Schedule Your Day</h1>
 					<p className="text-muted max-w-2xl mx-auto">
-						Calendly helps you manage your appointments effortlessly. Click on any date to create
+						Calend helps you manage your appointments effortlessly. Click on any date to create
 						an appointment, set a time or time range, and export directly to Google or Apple Calendar.
 					</p>
 				</div>

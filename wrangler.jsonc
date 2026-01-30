@@ -6,11 +6,11 @@
 	"$schema": "node_modules/wrangler/config-schema.json",
 	"routes": [
 		{
-			"pattern": "calendly.beyondyou.my.id",
+			"pattern": "calend.beyondyou.my.id",
 			"custom_domain": true
 		}
 	],
-	"name": "calendly",
+	"name": "calend",
 	"main": ".open-next/worker.js",
 	"compatibility_date": "2025-12-01",
 	"compatibility_flags": [
@@ -31,7 +31,7 @@
 			// Self-reference service binding, the service name must match the worker name
 			// see https://opennext.js.org/cloudflare/caching
 			"binding": "WORKER_SELF_REFERENCE",
-			"service": "calendly"
+			"service": "calend"
 		}
 	],
 	"observability": {

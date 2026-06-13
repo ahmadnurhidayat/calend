@@ -45,8 +45,12 @@ export async function POST(request: NextRequest) {
             candidateTimezone, reason
         } = body;
 
-        if (!userId || !date || !startTime || !endTime || !candidateName || !candidateEmail) {
+        if (!date || !startTime || !endTime || !candidateName || !candidateEmail) {
             return NextResponse.json({ error: 'Missing required fields' }, { status: 400 });
+        }
+
+        if (!userId && !teamId) {
+            return NextResponse.json({ error: 'userId or teamId is required' }, { status: 400 });
         }
 
         const emailRegex = /^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}$/;
@@ -67,10 +71,77 @@ export async function POST(request: NextRequest) {
             return NextResponse.json({ error: 'Cannot book more than 30 days in advance' }, { status: 400 });
         }
 
+        let assignedUserId = userId;
+
+        // Round-robin: find first available team member
+        if (teamId && !userId) {
+            const { data: members } = await supabase
+                .from('team_members')
+                .select('user_id')
+                .eq('team_id', teamId);
+
+            if (!members || members.length === 0) {
+                return NextResponse.json({ error: 'No members in this team' }, { status: 400 });
+            }
+
+            const dayOfWeek = bookingDate.getDay();
+            const bookingStartMinutes = parseInt(startTime.split(':')[0]) * 60 + parseInt(startTime.split(':')[1]);
+            const bookingEndMinutes = parseInt(endTime.split(':')[0]) * 60 + parseInt(endTime.split(':')[1]);
+
+            for (const member of members) {
+                const { data: memberUser } = await supabase
+                    .from('users')
+                    .select('id, name, email')
+                    .eq('id', member.user_id)
+                    .single();
+
+                if (!memberUser) continue;
+
+                // Check availability
+                const { data: avail } = await supabase
+                    .from('availability')
+                    .select('start_time, end_time')
+                    .eq('user_id', memberUser.id)
+                    .eq('day_of_week', dayOfWeek)
+                    .eq('is_active', true)
+                    .single();
+
+                if (!avail) continue;
+
+                const [availStartH, availStartM] = avail.start_time.split(':').map(Number);
+                const [availEndH, availEndM] = avail.end_time.split(':').map(Number);
+                const availStart = availStartH * 60 + availStartM;
+                const availEnd = availEndH * 60 + availEndM;
+
+                if (bookingStartMinutes < availStart || bookingEndMinutes > availEnd) continue;
+
+                // Check existing bookings (range overlap)
+                const { data: conflict } = await supabase
+                    .from('bookings')
+                    .select('id')
+                    .eq('user_id', memberUser.id)
+                    .lt('start_time', endTime)
+                    .gt('end_time', startTime)
+                    .eq('date', date)
+                    .neq('status', 'cancelled')
+                    .maybeSingle();
+
+                if (conflict) continue;
+
+                 // Found available member
+                 assignedUserId = memberUser.id;
+                 break;
+             }
+
+             if (!assignedUserId || assignedUserId !== userId) {
+                 return NextResponse.json({ error: 'No team members available at this time' }, { status: 409 });
+             }
+         }
+
         const { data: targetUser } = await supabase
             .from('users')
             .select('id, name, email, username')
-            .eq('id', userId)
+            .eq('id', assignedUserId)
             .single();
 
         if (!targetUser) {
@@ -81,7 +152,7 @@ export async function POST(request: NextRequest) {
         const { count: bookingCount } = await supabase
             .from('bookings')
             .select('*', { count: 'exact', head: true })
-            .eq('user_id', userId)
+            .eq('user_id', assignedUserId)
             .neq('status', 'cancelled');
 
         if (bookingCount !== null && bookingCount >= BOOKING_LIMIT_PER_USER) {
@@ -94,7 +165,7 @@ export async function POST(request: NextRequest) {
         const { data: existing } = await supabase
             .from('bookings')
             .select('id')
-            .eq('user_id', userId)
+            .eq('user_id', assignedUserId)
             .lt('start_time', endTime)
             .gt('end_time', startTime)
             .eq('date', date)
@@ -110,7 +181,7 @@ export async function POST(request: NextRequest) {
         const { data: availSlot } = await supabase
             .from('availability')
             .select('id')
-            .eq('user_id', userId)
+            .eq('user_id', assignedUserId)
             .eq('day_of_week', dayOfWeek)
             .eq('is_active', true)
             .single();
@@ -168,7 +239,7 @@ export async function POST(request: NextRequest) {
         let googleEventId: string | null = null;
         let meetLink: string | undefined;
         try {
-            const result = await createCalendarEvent(userId, {
+            const result = await createCalendarEvent(assignedUserId, {
                 title: eventTitle,
                 description: `${reason || `Scheduled via Calend`}\n\nCandidate: ${candidateName}\nEmail: ${candidateEmail}\n\nReschedule: ${env.nextAuthUrl}/reschedule/${rescheduleToken}`,
                 startTime: gCalStart,
@@ -184,7 +255,7 @@ export async function POST(request: NextRequest) {
                 try {
                     const { google } = await import('googleapis');
                     const { getGoogleAuth } = await import('@/lib/google-auth');
-                    const auth = await getGoogleAuth(userId);
+                    const auth = await getGoogleAuth(assignedUserId);
                     const calendar = google.calendar({ version: 'v3', auth });
                     const event = await calendar.events.get({
                         calendarId: 'primary',
@@ -203,8 +274,9 @@ export async function POST(request: NextRequest) {
         const { data: booking, error } = await supabase
             .from('bookings')
             .insert({
-                user_id: userId,
+                user_id: assignedUserId,
                 event_type_id: eventTypeId || null,
+                team_id: teamId || null,
                 date,
                 start_time: startTime,
                 end_time: endTime,
@@ -244,7 +316,7 @@ export async function POST(request: NextRequest) {
                         .select('email')
                         .eq('id', member.user_id)
                         .single();
-                    if (memberUser && memberUser.email !== targetUser.email) {
+                    if (memberUser && memberUser.email !== targetUser.email && memberUser.email !== candidateEmail) {
                         teamMemberEmails.push(memberUser.email);
                     }
                 }

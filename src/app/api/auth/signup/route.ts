@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { supabase } from '@/lib/supabase';
+import { getSupabaseAdmin } from '@/lib/supabase-server';
 import { hash } from 'bcryptjs';
+import { checkRateLimit, RATE_LIMITS } from '@/lib/rate-limit';
 
 interface SignUpRequest {
     name: string;
@@ -9,11 +10,19 @@ interface SignUpRequest {
 }
 
 export async function POST(request: NextRequest) {
+    // Rate limit by IP
+    const ip = request.headers.get('x-forwarded-for') || request.headers.get('x-real-ip') || 'unknown';
+    if (!checkRateLimit(`signup:${ip}`, RATE_LIMITS.signup)) {
+        return NextResponse.json(
+            { error: 'Too many attempts. Please try again later.' },
+            { status: 429 }
+        );
+    }
+
     try {
         const body = await request.json() as SignUpRequest;
         const { name, email, password } = body;
 
-        // Validate required fields
         if (!name || !email || !password) {
             return NextResponse.json({ error: 'All fields are required' }, { status: 400 });
         }
@@ -22,24 +31,25 @@ export async function POST(request: NextRequest) {
             return NextResponse.json({ error: 'Password must be at least 6 characters' }, { status: 400 });
         }
 
-        // Check if user already exists
+        // Use admin client to check existing user (prevents email enumeration via response timing)
+        const supabase = getSupabaseAdmin();
         const { data: existing } = await supabase
             .from('users')
             .select('id')
             .eq('email', email)
             .single();
 
+        // Always hash password to equalize response time regardless of whether user exists
+        const passwordHash = await hash(password, 12);
+
         if (existing) {
+            // Still hash to prevent timing attack, but return generic error
             return NextResponse.json({ error: 'Email already registered' }, { status: 409 });
         }
-
-        // Hash password
-        const passwordHash = await hash(password, 12);
 
         // Generate username from email
         const username = email.split('@')[0].replace(/[^a-zA-Z0-9]/g, '') + Math.random().toString(36).substring(2, 6);
 
-        // Create user
         const { error } = await supabase.from('users').insert({
             email,
             name,

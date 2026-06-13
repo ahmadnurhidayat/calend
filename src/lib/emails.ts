@@ -1,11 +1,12 @@
 import { Resend } from 'resend';
 import { canSendEmail, recordEmailSend } from './email-rate-limit';
+import { env } from './env';
 
 let resend: Resend;
 
 function getResend(): Resend {
     if (!resend) {
-        resend = new Resend(process.env.RESEND_API_KEY);
+        resend = new Resend(env.resendApiKey);
     }
     return resend;
 }
@@ -89,7 +90,6 @@ function buildHostEmail(params: SendBookingEmailsParams): string {
 }
 
 export async function sendBookingEmails(params: SendBookingEmailsParams): Promise<void> {
-    const fromEmail = process.env.EMAIL_FROM || 'Calend <onboarding@resend.dev>';
 
     const allowed = await canSendEmail(params.candidateEmail);
     if (!allowed) {
@@ -100,14 +100,14 @@ export async function sendBookingEmails(params: SendBookingEmailsParams): Promis
     const promises: Promise<unknown>[] = [
         // Email to candidate
         getResend().emails.send({
-            from: fromEmail,
+            from: env.emailFrom,
             to: params.candidateEmail,
             subject: `Booking Confirmed: ${params.eventTitle} with ${params.hostName}`,
             html: buildConfirmationEmail(params),
         }),
         // Email to host
         getResend().emails.send({
-            from: fromEmail,
+            from: env.emailFrom,
             to: params.hostEmail,
             subject: `New Booking: ${params.candidateName} - ${params.eventTitle}`,
             html: buildHostEmail(params),
@@ -119,7 +119,7 @@ export async function sendBookingEmails(params: SendBookingEmailsParams): Promis
         for (const email of params.teamMemberEmails) {
             promises.push(
                 getResend().emails.send({
-                    from: fromEmail,
+                    from: env.emailFrom,
                     to: email,
                     subject: `Team Booking: ${params.candidateName} - ${params.eventTitle}`,
                     html: buildHostEmail(params),
@@ -228,17 +228,16 @@ function buildRescheduleHostEmail(params: RescheduleEmailParams): string {
 }
 
 export async function sendRescheduleEmails(params: RescheduleEmailParams): Promise<void> {
-    const fromEmail = process.env.EMAIL_FROM || 'Calend <onboarding@resend.dev>';
 
     await Promise.allSettled([
         getResend().emails.send({
-            from: fromEmail,
+            from: env.emailFrom,
             to: params.candidateEmail,
             subject: `Meeting Rescheduled: ${params.eventTitle} with ${params.hostName}`,
             html: buildRescheduleCandidateEmail(params),
         }),
         getResend().emails.send({
-            from: fromEmail,
+            from: env.emailFrom,
             to: params.hostEmail,
             subject: `Meeting Rescheduled: ${params.candidateName} - ${params.eventTitle}`,
             html: buildRescheduleHostEmail(params),

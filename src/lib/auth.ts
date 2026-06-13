@@ -1,6 +1,6 @@
 import GoogleProvider from 'next-auth/providers/google';
 import CredentialsProvider from 'next-auth/providers/credentials';
-import { supabase } from '@/lib/supabase';
+import { getSupabaseAdmin } from '@/lib/supabase-server';
 import { compare } from 'bcryptjs';
 import type { NextAuthOptions } from 'next-auth';
 
@@ -28,6 +28,7 @@ export const authOptions: NextAuthOptions = {
                     throw new Error('Email and password required');
                 }
 
+                const supabase = getSupabaseAdmin();
                 const { data: user } = await supabase
                     .from('users')
                     .select('*')
@@ -54,6 +55,7 @@ export const authOptions: NextAuthOptions = {
     callbacks: {
         async signIn({ user, account }) {
             if (account?.provider === 'google' && user.email) {
+                const supabase = getSupabaseAdmin();
                 const { data: existingUser } = await supabase
                     .from('users')
                     .select('*')

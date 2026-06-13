@@ -3,7 +3,6 @@
 import { useSession } from 'next-auth/react';
 import { useRouter } from 'next/navigation';
 import { useEffect, useState, useCallback } from 'react';
-import { supabase } from '@/lib/supabase';
 
 interface DayAvailability {
     day: number;
@@ -32,36 +31,32 @@ export default function AvailabilityPage() {
     );
 
     const loadAvailability = useCallback(async () => {
-        const { data: user } = await supabase
-            .from('users')
-            .select('id')
-            .eq('email', session?.user?.email)
-            .single();
+        try {
+            const res = await fetch('/api/availability');
+            if (!res.ok) return;
 
-        if (!user) return;
-
-        const { data } = await supabase
-            .from('availability')
-            .select('*')
-            .eq('user_id', user.id);
-
-        if (data && data.length > 0) {
-            setAvailability(prev =>
-                prev.map(day => {
-                    const saved = data.find((d: { day_of_week: number }) => d.day_of_week === day.day);
-                    if (saved) {
-                        return {
-                            ...day,
-                            isActive: saved.is_active,
-                            startTime: saved.start_time,
-                            endTime: saved.end_time,
-                        };
-                    }
-                    return day;
-                })
-            );
+            const data = await res.json() as { availability?: { day_of_week: number; start_time: string; end_time: string; is_active?: boolean }[] };
+            if (data.availability && data.availability.length > 0) {
+                const avail = data.availability;
+                setAvailability(prev =>
+                    prev.map(day => {
+                        const saved = avail.find((d) => d.day_of_week === day.day);
+                        if (saved) {
+                            return {
+                                ...day,
+                                isActive: saved.is_active ?? true,
+                                startTime: saved.start_time,
+                                endTime: saved.end_time,
+                            };
+                        }
+                        return day;
+                    })
+                );
+            }
+        } catch {
+            // silent fail
         }
-    }, [session?.user?.email]);
+    }, []);
 
     useEffect(() => {
         if (status === 'unauthenticated') {
@@ -78,32 +73,29 @@ export default function AvailabilityPage() {
     const handleSave = async () => {
         setSaving(true);
 
-        const { data: user } = await supabase
-            .from('users')
-            .select('id')
-            .eq('email', session?.user?.email)
-            .single();
+        try {
+            const payload = availability.map(day => ({
+                day_of_week: day.day,
+                start_time: day.startTime,
+                end_time: day.endTime,
+                is_active: day.isActive,
+            }));
 
-        if (!user) {
-            setSaving(false);
-            return;
+            const res = await fetch('/api/availability', {
+                method: 'PUT',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ availability: payload }),
+            });
+
+            if (res.ok) {
+                setSaved(true);
+                setTimeout(() => setSaved(false), 2000);
+            }
+        } catch {
+            // silent fail
         }
 
-        await supabase.from('availability').delete().eq('user_id', user.id);
-
-        const records = availability.map(day => ({
-            user_id: user.id,
-            day_of_week: day.day,
-            start_time: day.startTime,
-            end_time: day.endTime,
-            is_active: day.isActive,
-        }));
-
-        await supabase.from('availability').insert(records);
-
         setSaving(false);
-        setSaved(true);
-        setTimeout(() => setSaved(false), 2000);
     };
 
     const toggleDay = (dayIndex: number) => {
@@ -145,7 +137,7 @@ export default function AvailabilityPage() {
                         <h1 className="text-2xl font-bold text-foreground">Availability</h1>
                         <p className="text-muted">Set your available hours for bookings</p>
                     </div>
-                    <a href="/dashboard" className="text-primary hover:underline">← Back</a>
+                    <a href="/dashboard" className="text-primary hover:underline">&larr; Back</a>
                 </div>
 
                 <div className="glass-card p-6">

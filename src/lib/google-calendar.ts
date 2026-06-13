@@ -1,55 +1,43 @@
-import { google } from 'googleapis';
-import { supabase } from './supabase';
+import { getGoogleAuth } from './google-auth';
 
+interface CalendarEventParams {
+    title: string;
+    description?: string;
+    startTime: Date;
+    endTime: Date;
+    attendeeEmails: string[];
+    timezone?: string;
+    addVideoLink?: boolean;
+}
+
+/**
+ * Create a Google Calendar event using the user's OAuth token.
+ * Supports video conferencing (Google Meet) and multiple attendees.
+ * Edge-compatible (uses native fetch via googleapis).
+ */
 export async function createCalendarEvent(
     userId: string,
-    event: {
-        title: string;
-        description?: string;
-        startTime: Date;
-        endTime: Date;
-        attendeeEmail: string;
-    }
-): Promise<string> {
-    // Get user's tokens from database
-    const { data: user, error } = await supabase
-        .from('users')
-        .select('google_access_token, google_refresh_token')
-        .eq('id', userId)
-        .single();
+    event: CalendarEventParams
+): Promise<string | null> {
+    try {
+        const { google } = await import('googleapis');
+        const auth = await getGoogleAuth(userId);
+        const calendar = google.calendar({ version: 'v3', auth });
 
-    if (error || !user?.google_access_token) {
-        throw new Error('User not found or not connected to Google');
-    }
+        const timezone = event.timezone || 'Asia/Jakarta';
 
-    // Create OAuth2 client
-    const oauth2Client = new google.auth.OAuth2(
-        process.env.GOOGLE_CLIENT_ID,
-        process.env.GOOGLE_CLIENT_SECRET
-    );
-
-    oauth2Client.setCredentials({
-        access_token: user.google_access_token,
-        refresh_token: user.google_refresh_token,
-    });
-
-    // Create calendar event
-    const calendar = google.calendar({ version: 'v3', auth: oauth2Client });
-
-    const calendarEvent = await calendar.events.insert({
-        calendarId: 'primary',
-        requestBody: {
+        const requestBody: Record<string, unknown> = {
             summary: event.title,
             description: event.description,
             start: {
                 dateTime: event.startTime.toISOString(),
-                timeZone: 'Asia/Jakarta',
+                timeZone: timezone,
             },
             end: {
                 dateTime: event.endTime.toISOString(),
-                timeZone: 'Asia/Jakarta',
+                timeZone: timezone,
             },
-            attendees: [{ email: event.attendeeEmail }],
+            attendees: event.attendeeEmails.map(email => ({ email })),
             reminders: {
                 useDefault: false,
                 overrides: [
@@ -57,10 +45,99 @@ export async function createCalendarEvent(
                     { method: 'popup', minutes: 30 },
                 ],
             },
-        },
-        sendUpdates: 'all',
-    });
+        };
 
-    return calendarEvent.data.id || '';
+        // Add Google Meet video conferencing if requested
+        if (event.addVideoLink) {
+            requestBody.conferenceData = {
+                createRequest: {
+                    requestId: `${Date.now()}-${Math.random().toString(36).slice(2)}`,
+                    conferenceSolutionKey: { type: 'hangoutsMeet' },
+                },
+            };
+        }
+
+        const calendarEvent = await calendar.events.insert({
+            calendarId: 'primary',
+            requestBody,
+            conferenceDataVersion: event.addVideoLink ? 1 : 0,
+            sendUpdates: 'all',
+        });
+
+        return calendarEvent.data.id || null;
+    } catch (error) {
+        console.error('Failed to create calendar event:', error);
+        return null;
+    }
 }
 
+/**
+ * Update an existing Google Calendar event.
+ */
+export async function updateCalendarEvent(
+    userId: string,
+    eventId: string,
+    event: Partial<CalendarEventParams>
+): Promise<boolean> {
+    try {
+        const { google } = await import('googleapis');
+        const auth = await getGoogleAuth(userId);
+        const calendar = google.calendar({ version: 'v3', auth });
+
+        const updateData: Record<string, unknown> = {};
+        if (event.title) updateData.summary = event.title;
+        if (event.description) updateData.description = event.description;
+        if (event.startTime) {
+            updateData.start = {
+                dateTime: event.startTime.toISOString(),
+                timeZone: event.timezone || 'Asia/Jakarta',
+            };
+        }
+        if (event.endTime) {
+            updateData.end = {
+                dateTime: event.endTime.toISOString(),
+                timeZone: event.timezone || 'Asia/Jakarta',
+            };
+        }
+        if (event.attendeeEmails) {
+            updateData.attendees = event.attendeeEmails.map(email => ({ email }));
+        }
+
+        await calendar.events.patch({
+            calendarId: 'primary',
+            eventId,
+            requestBody: updateData,
+            sendUpdates: 'all',
+        });
+
+        return true;
+    } catch (error) {
+        console.error('Failed to update calendar event:', error);
+        return false;
+    }
+}
+
+/**
+ * Delete a Google Calendar event.
+ */
+export async function deleteCalendarEvent(
+    userId: string,
+    eventId: string
+): Promise<boolean> {
+    try {
+        const { google } = await import('googleapis');
+        const auth = await getGoogleAuth(userId);
+        const calendar = google.calendar({ version: 'v3', auth });
+
+        await calendar.events.delete({
+            calendarId: 'primary',
+            eventId,
+            sendUpdates: 'all',
+        });
+
+        return true;
+    } catch (error) {
+        console.error('Failed to delete calendar event:', error);
+        return false;
+    }
+}

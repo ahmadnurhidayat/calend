@@ -1,103 +1,128 @@
 'use client';
 
 import { useState, useEffect, use, useCallback } from 'react';
-import { getSupabase, User, Availability, Booking } from '@/lib/supabase';
+import { getSupabase, Team } from '@/lib/supabase';
+
+interface EventType {
+    id: string;
+    title: string;
+    slug: string;
+    description: string | null;
+    duration: number;
+    is_active: boolean;
+}
 
 interface TimeSlot {
     time: string;
+    endTime: string;
     available: boolean;
 }
 
-export default function BookingPage({ params }: { params: Promise<{ username: string }> }) {
-    const { username } = use(params);
-    const [recruiter, setRecruiter] = useState<User | null>(null);
-    const [availability, setAvailability] = useState<Availability[]>([]);
-    const [bookings, setBookings] = useState<Booking[]>([]);
+interface TeamMember {
+    user_id: string;
+    users?: { name: string; email: string };
+}
+
+export default function TeamEventTypeBookingPage({
+    params
+}: {
+    params: Promise<{ teamSlug: string; eventSlug: string }>
+}) {
+    const { teamSlug, eventSlug } = use(params);
+    const [team, setTeam] = useState<Team | null>(null);
+    const [eventType, setEventType] = useState<EventType | null>(null);
+    const [teamMembers, setTeamMembers] = useState<TeamMember[]>([]);
     const [selectedDate, setSelectedDate] = useState<Date | null>(null);
     const [selectedTime, setSelectedTime] = useState('');
     const [candidateName, setCandidateName] = useState('');
     const [candidateEmail, setCandidateEmail] = useState('');
+    const [candidateTimezone, setCandidateTimezone] = useState(Intl.DateTimeFormat().resolvedOptions().timeZone);
     const [reason, setReason] = useState('');
     const [loading, setLoading] = useState(true);
     const [booking, setBooking] = useState(false);
     const [success, setSuccess] = useState(false);
     const [error, setError] = useState('');
+    const [meetLink, setMeetLink] = useState('');
 
-    const loadRecruiterData = useCallback(async () => {
+    const loadData = useCallback(async () => {
         const supabase = getSupabase();
-        const { data: user } = await supabase
-            .from('users')
+        const { data: teamData } = await supabase
+            .from('teams')
             .select('*')
-            .eq('username', username)
+            .eq('slug', teamSlug)
             .single();
 
-        if (!user) {
+        if (!teamData) {
             setLoading(false);
             return;
         }
+        setTeam(teamData);
 
-        setRecruiter(user);
-
-        const { data: availData } = await supabase
-            .from('availability')
+        const { data: event } = await supabase
+            .from('event_types')
             .select('*')
-            .eq('user_id', user.id)
-            .eq('is_active', true);
+            .eq('team_id', teamData.id)
+            .eq('slug', eventSlug)
+            .eq('is_active', true)
+            .single();
 
-        if (availData) {
-            setAvailability(availData);
+        if (!event) {
+            setLoading(false);
+            return;
         }
+        setEventType(event);
 
-        const { data: bookingsData } = await supabase
-            .from('bookings')
-            .select('*')
-            .eq('user_id', user.id);
+        const { data: members } = await supabase
+            .from('team_members')
+            .select('user_id, users(name, email)')
+            .eq('team_id', teamData.id);
 
-        if (bookingsData) {
-            setBookings(bookingsData);
+        if (members) {
+            const mapped = members.map((m: Record<string, unknown>) => ({
+                user_id: m.user_id as string,
+                users: Array.isArray(m.users) ? m.users[0] : m.users,
+            })) as TeamMember[];
+            setTeamMembers(mapped);
         }
 
         setLoading(false);
-    }, [username]);
+    }, [teamSlug, eventSlug]);
 
     useEffect(() => {
-        loadRecruiterData();
-    }, [loadRecruiterData]);
+        loadData();
+    }, [loadData]);
 
-    const getAvailableSlots = (date: Date): TimeSlot[] => {
-        const dayOfWeek = date.getDay();
-        const dayAvail = availability.find(a => a.day_of_week === dayOfWeek);
+    const [availableSlots, setAvailableSlots] = useState<TimeSlot[]>([]);
 
-        if (!dayAvail) return [];
+    useEffect(() => {
+        if (!selectedDate || !teamSlug || !eventSlug) return;
 
-        const slots: TimeSlot[] = [];
-        const [startHour, startMin] = dayAvail.start_time.split(':').map(Number);
-        const [endHour, endMin] = dayAvail.end_time.split(':').map(Number);
-
-        const dateStr = date.toISOString().split('T')[0];
-        const bookedTimes = bookings
-            .filter(b => b.date === dateStr)
-            .map(b => b.start_time);
-
-        for (let h = startHour; h < endHour || (h === endHour && 0 < endMin); h++) {
-            for (let m = 0; m < 60; m += 30) {
-                if (h === startHour && m < startMin) continue;
-                if (h === endHour && m >= endMin) break;
-
-                const timeStr = `${h.toString().padStart(2, '0')}:${m.toString().padStart(2, '0')}`;
-                slots.push({
-                    time: timeStr,
-                    available: !bookedTimes.includes(timeStr),
-                });
+        const fetchSlots = async () => {
+            const dateStr = selectedDate.toISOString().split('T')[0];
+            try {
+                const res = await fetch(
+                    `/api/slots?teamSlug=${teamSlug}&eventSlug=${eventSlug}&date=${dateStr}&timezone=${candidateTimezone}`
+                );
+                const data = await res.json() as { slots?: TimeSlot[] };
+                setAvailableSlots(data.slots || []);
+            } catch {
+                setAvailableSlots([]);
             }
-        }
+        };
 
-        return slots;
-    };
+        fetchSlots();
+    }, [selectedDate, candidateTimezone, teamSlug, eventSlug]);
 
     const handleBooking = async () => {
-        if (!recruiter || !selectedDate || !selectedTime || !candidateName || !candidateEmail) {
+        if (!team || !eventType || !selectedDate || !selectedTime || !candidateName || !candidateEmail) {
             setError('Please fill in all required fields');
+            return;
+        }
+
+        // Get primary user ID from team members
+        const primaryMember = teamMembers[0];
+        if (!primaryMember) {
+            setError('Team has no members');
             return;
         }
 
@@ -105,24 +130,35 @@ export default function BookingPage({ params }: { params: Promise<{ username: st
         setError('');
 
         try {
-            const response = await fetch('/api/book', {
+            const [h, m] = selectedTime.split(':').map(Number);
+            const endMinutes = h * 60 + m + eventType.duration;
+            const endH = Math.floor(endMinutes / 60);
+            const endM = endMinutes % 60;
+            const endTime = `${endH.toString().padStart(2, '0')}:${endM.toString().padStart(2, '0')}`;
+
+            const res = await fetch('/api/book', {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({
-                    userId: recruiter.id,
+                    userId: primaryMember.user_id,
+                    eventTypeId: eventType.id,
+                    teamId: team.id,
                     date: selectedDate.toISOString().split('T')[0],
                     startTime: selectedTime,
-                    endTime: addMinutes(selectedTime, 30),
+                    endTime,
                     candidateName,
                     candidateEmail,
+                    candidateTimezone,
                     reason,
                 }),
             });
 
-            if (response.ok) {
+            if (res.ok) {
+                const data = await res.json() as { meetLink?: string };
+                setMeetLink(data.meetLink || '');
                 setSuccess(true);
             } else {
-                const data = await response.json() as { error?: string };
+                const data = await res.json() as { error?: string };
                 setError(data.error || 'Failed to book appointment');
             }
         } catch {
@@ -132,18 +168,10 @@ export default function BookingPage({ params }: { params: Promise<{ username: st
         setBooking(false);
     };
 
-    const addMinutes = (time: string, minutes: number): string => {
-        const [h, m] = time.split(':').map(Number);
-        const totalMin = h * 60 + m + minutes;
-        const newH = Math.floor(totalMin / 60);
-        const newM = totalMin % 60;
-        return `${newH.toString().padStart(2, '0')}:${newM.toString().padStart(2, '0')}`;
-    };
-
     const generateCalendarDays = () => {
         const today = new Date();
         const days: Date[] = [];
-        for (let i = 0; i < 14; i++) {
+        for (let i = 1; i <= 14; i++) {
             const date = new Date(today);
             date.setDate(today.getDate() + i);
             days.push(date);
@@ -162,12 +190,12 @@ export default function BookingPage({ params }: { params: Promise<{ username: st
         );
     }
 
-    if (!recruiter) {
+    if (!team || !eventType) {
         return (
             <div className="flex-1 flex items-center justify-center p-4">
                 <div className="text-center">
-                    <h1 className="text-2xl font-bold text-foreground mb-2">User Not Found</h1>
-                    <p className="text-muted">The booking link you followed is invalid.</p>
+                    <h1 className="text-2xl font-bold text-foreground mb-2">Not Found</h1>
+                    <p className="text-muted">This team event does not exist or is no longer active.</p>
                 </div>
             </div>
         );
@@ -184,11 +212,16 @@ export default function BookingPage({ params }: { params: Promise<{ username: st
                     </div>
                     <h1 className="text-2xl font-bold text-foreground mb-2">Booking Confirmed!</h1>
                     <p className="text-muted mb-4">
-                        Your meeting with {recruiter.name} has been scheduled. You&apos;ll receive a confirmation at {candidateEmail}.
+                        Your {eventType.duration}-minute {eventType.title} with {team.name} has been scheduled.
                     </p>
-                    <p className="text-sm text-primary font-medium">
+                    <p className="text-sm text-primary font-medium mb-4">
                         {selectedDate?.toLocaleDateString('en-US', { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' })} at {selectedTime}
                     </p>
+                    {meetLink && (
+                        <a href={meetLink} target="_blank" rel="noopener noreferrer" className="btn-primary inline-block">
+                            Join Google Meet
+                        </a>
+                    )}
                 </div>
             </div>
         );
@@ -197,10 +230,38 @@ export default function BookingPage({ params }: { params: Promise<{ username: st
     return (
         <div className="p-4 sm:p-8">
             <div className="max-w-2xl mx-auto">
-                {/* Header */}
                 <div className="text-center mb-8">
-                    <h1 className="text-2xl font-bold text-foreground mb-2">Book a Meeting with {recruiter.name}</h1>
-                    <p className="text-muted">Select a date and time that works for you.</p>
+                    <h1 className="text-2xl font-bold text-foreground mb-2">{eventType.title}</h1>
+                    <p className="text-muted">{team.name} &middot; {eventType.duration} minutes</p>
+                    {eventType.description && (
+                        <p className="text-sm text-muted mt-2">{eventType.description}</p>
+                    )}
+                    <div className="flex justify-center gap-2 mt-4">
+                        {teamMembers.map(member => (
+                            <div key={member.user_id} className="bg-secondary px-3 py-1 rounded-full text-sm text-muted">
+                                {member.users?.name}
+                            </div>
+                        ))}
+                    </div>
+                </div>
+
+                {/* Timezone selector */}
+                <div className="glass-card p-4 mb-6">
+                    <label className="text-sm text-muted">Your Timezone</label>
+                    <select
+                        value={candidateTimezone}
+                        onChange={(e) => setCandidateTimezone(e.target.value)}
+                        className="input-field w-full mt-2"
+                    >
+                        <option value="Asia/Jakarta">Asia/Jakarta (WIB)</option>
+                        <option value="Asia/Makassar">Asia/Makassar (WITA)</option>
+                        <option value="Asia/Jayapura">Asia/Jayapura (WIT)</option>
+                        <option value="Asia/Singapore">Asia/Singapore (SGT)</option>
+                        <option value="Asia/Tokyo">Asia/Tokyo (JST)</option>
+                        <option value="America/New_York">America/New_York (EST)</option>
+                        <option value="America/Los_Angeles">America/Los_Angeles (PST)</option>
+                        <option value="Europe/London">Europe/London (GMT)</option>
+                    </select>
                 </div>
 
                 {/* Date Selection */}
@@ -208,20 +269,14 @@ export default function BookingPage({ params }: { params: Promise<{ username: st
                     <h2 className="font-semibold text-foreground mb-4">Select a Date</h2>
                     <div className="flex gap-2 overflow-x-auto pb-2">
                         {generateCalendarDays().map(date => {
-                            const slots = getAvailableSlots(date);
-                            const hasSlots = slots.some(s => s.available);
                             const isSelected = selectedDate?.toDateString() === date.toDateString();
-
                             return (
                                 <button
                                     key={date.toISOString()}
                                     onClick={() => { setSelectedDate(date); setSelectedTime(''); }}
-                                    disabled={!hasSlots}
                                     className={`flex-shrink-0 p-3 rounded-xl text-center transition-all ${isSelected
                                         ? 'bg-primary text-white'
-                                        : hasSlots
-                                            ? 'bg-secondary hover:bg-primary/20'
-                                            : 'opacity-50 cursor-not-allowed'
+                                        : 'bg-secondary hover:bg-primary/20'
                                         }`}
                                 >
                                     <div className="text-xs">{dayNames[date.getDay()]}</div>
@@ -238,7 +293,7 @@ export default function BookingPage({ params }: { params: Promise<{ username: st
                     <div className="glass-card p-6 mb-6">
                         <h2 className="font-semibold text-foreground mb-4">Select a Time</h2>
                         <div className="grid grid-cols-4 sm:grid-cols-6 gap-2">
-                            {getAvailableSlots(selectedDate).map(slot => (
+                            {availableSlots.map(slot => (
                                 <button
                                     key={slot.time}
                                     onClick={() => setSelectedTime(slot.time)}

@@ -1,158 +1,165 @@
 'use client';
 
-import { useState, useEffect } from 'react';
-import Calendar from '@/components/Calendar';
-import NextDayInfo from '@/components/NextDayInfo';
-import AppointmentModal from '@/components/AppointmentModal';
-import DateCalculator from '@/components/DateCalculator';
+import Link from 'next/link';
+import { useSession } from 'next-auth/react';
 
-interface Appointment {
-	id: string;
-	date: string;
-	time: string;
-	endTime?: string;
-	title: string;
-	note: string;
-}
+const features = [
+    {
+        title: 'Set Your Availability',
+        description: 'Define your available hours for each day of the week. Only show times that work for you.',
+        icon: (
+            <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
+            </svg>
+        ),
+    },
+    {
+        title: 'Share Your Link',
+        description: 'Get a personalized booking link. Share it via email, chat, or embed it on your website.',
+        icon: (
+            <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13.828 10.172a4 4 0 00-5.656 0l-4 4a4 4 0 105.656 5.656l1.102-1.101m-.758-4.899a4 4 0 005.656 0l4-4a4 4 0 00-5.656-5.656l-1.1 1.1" />
+            </svg>
+        ),
+    },
+    {
+        title: 'Get Booked Instantly',
+        description: 'Candidates pick a date and time. Events are added to your Google Calendar automatically.',
+        icon: (
+            <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
+            </svg>
+        ),
+    },
+];
 
-export default function Home() {
-	const [selectedDate, setSelectedDate] = useState<Date | null>(null);
-	const [isModalOpen, setIsModalOpen] = useState(false);
-	const [appointments, setAppointments] = useState<Appointment[]>([]);
+const steps = [
+    { step: '1', title: 'Sign Up', description: 'Create your free account in seconds.' },
+    { step: '2', title: 'Set Availability', description: 'Choose the hours you\'re available.' },
+    { step: '3', title: 'Share Link', description: 'Send your booking link to anyone.' },
+    { step: '4', title: 'Get Booked', description: 'Meetings appear on your calendar.' },
+];
 
-	// Load appointments from localStorage on mount
-	useEffect(() => {
-		const saved = localStorage.getItem('calend-appointments');
-		if (saved) {
-			setAppointments(JSON.parse(saved));
-		}
-	}, []);
+export default function HomePage() {
+    const { data: session } = useSession();
 
-	// Save appointments to localStorage
-	useEffect(() => {
-		localStorage.setItem('calend-appointments', JSON.stringify(appointments));
-	}, [appointments]);
+    return (
+        <div className="min-h-full">
+            {/* Hero */}
+            <section className="relative overflow-hidden">
+                <div className="max-w-6xl mx-auto px-4 sm:px-8 pt-16 pb-20 sm:pt-24 sm:pb-28">
+                    <div className="text-center max-w-3xl mx-auto">
+                        <div className="inline-flex items-center gap-2 bg-primary/10 text-primary px-4 py-1.5 rounded-full text-sm font-medium mb-6">
+                            <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 10V3L4 14h7v7l9-11h-7z" />
+                            </svg>
+                            Free scheduling for professionals
+                        </div>
+                        <h1 className="text-4xl sm:text-5xl font-bold text-foreground mb-6 leading-tight">
+                            Stop the back-and-forth.<br />
+                            <span className="bg-gradient-to-r from-primary to-accent bg-clip-text text-transparent">
+                                Let people book you.
+                            </span>
+                        </h1>
+                        <p className="text-lg text-muted mb-8 max-w-2xl mx-auto">
+                            Calend lets you set your availability, share a booking link, and let candidates
+                            schedule meetings directly &mdash; no emails required.
+                        </p>
+                        <div className="flex flex-col sm:flex-row items-center justify-center gap-4">
+                            {session ? (
+                                <Link href="/dashboard" className="btn-primary text-base px-8 py-3">
+                                    Go to Dashboard
+                                </Link>
+                            ) : (
+                                <>
+                                    <Link href="/signup" className="btn-primary text-base px-8 py-3">
+                                        Get Started Free
+                                    </Link>
+                                    <Link href="/login" className="btn-secondary text-base px-8 py-3">
+                                        Sign In
+                                    </Link>
+                                </>
+                            )}
+                        </div>
+                    </div>
+                </div>
+            </section>
 
-	const handleDateSelect = (date: Date) => {
-		setSelectedDate(date);
-		setIsModalOpen(true);
-	};
+            {/* Features */}
+            <section className="border-t border-border bg-secondary/30">
+                <div className="max-w-6xl mx-auto px-4 sm:px-8 py-16 sm:py-20">
+                    <div className="text-center mb-12">
+                        <h2 className="text-2xl sm:text-3xl font-bold text-foreground mb-3">
+                            How Calend Works
+                        </h2>
+                        <p className="text-muted max-w-xl mx-auto">
+                            Three simple steps to let others book time with you.
+                        </p>
+                    </div>
+                    <div className="grid grid-cols-1 md:grid-cols-3 gap-8">
+                        {features.map((feature, i) => (
+                            <div key={i} className="glass-card p-6 text-center">
+                                <div className="w-12 h-12 rounded-xl bg-primary/10 flex items-center justify-center mx-auto mb-4 text-primary">
+                                    {feature.icon}
+                                </div>
+                                <h3 className="font-semibold text-foreground mb-2">{feature.title}</h3>
+                                <p className="text-sm text-muted">{feature.description}</p>
+                            </div>
+                        ))}
+                    </div>
+                </div>
+            </section>
 
-	const handleSaveAppointment = (appointment: { id: string; date: Date; time: string; endTime?: string; title: string; note: string }) => {
-		const newAppointment: Appointment = {
-			id: appointment.id,
-			date: appointment.date.toISOString(),
-			time: appointment.time,
-			endTime: appointment.endTime,
-			title: appointment.title,
-			note: appointment.note
-		};
-		setAppointments(prev => [...prev, newAppointment]);
-	};
+            {/* Steps */}
+            <section className="border-t border-border">
+                <div className="max-w-6xl mx-auto px-4 sm:px-8 py-16 sm:py-20">
+                    <div className="text-center mb-12">
+                        <h2 className="text-2xl sm:text-3xl font-bold text-foreground mb-3">
+                            Get Started in Minutes
+                        </h2>
+                        <p className="text-muted max-w-xl mx-auto">
+                            No complicated setup. Just sign up and start sharing your link.
+                        </p>
+                    </div>
+                    <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6">
+                        {steps.map((step, i) => (
+                            <div key={i} className="relative">
+                                <div className="glass-card p-6">
+                                    <div className="w-10 h-10 rounded-full bg-primary text-white flex items-center justify-center font-bold text-lg mb-4">
+                                        {step.step}
+                                    </div>
+                                    <h3 className="font-semibold text-foreground mb-1">{step.title}</h3>
+                                    <p className="text-sm text-muted">{step.description}</p>
+                                </div>
+                                {i < steps.length - 1 && (
+                                    <div className="hidden lg:block absolute top-1/2 -right-3 w-6 h-0.5 bg-border" />
+                                )}
+                            </div>
+                        ))}
+                    </div>
+                </div>
+            </section>
 
-	const handleDeleteAppointment = (id: string) => {
-		setAppointments(prev => prev.filter(a => a.id !== id));
-	};
-
-	const eventDates = appointments.map(a => new Date(a.date));
-
-	const formatAppointmentDate = (dateStr: string, time: string, endTime?: string) => {
-		const date = new Date(dateStr);
-		const dayNames = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
-		const monthNames = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
-		const timeDisplay = endTime ? `${time} - ${endTime}` : time;
-		return `${dayNames[date.getDay()]}, ${monthNames[date.getMonth()]} ${date.getDate()} at ${timeDisplay}`;
-	};
-
-	return (
-		<div className="p-4 sm:p-8">
-
-			{/* Main Content */}
-			<main className="max-w-6xl mx-auto">
-				{/* Hero Section */}
-				<div className="text-center mb-8">
-					<h1 className="text-3xl font-bold text-foreground mb-3">Schedule Your Day</h1>
-					<p className="text-muted max-w-2xl mx-auto">
-						Calend helps you manage your appointments effortlessly. Click on any date to create
-						an appointment, set a time or time range, and export directly to Google or Apple Calendar.
-					</p>
-				</div>
-
-				<div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-					{/* Calendar Section */}
-					<div className="lg:col-span-2 flex justify-center lg:justify-start">
-						<Calendar
-							selectedDate={selectedDate}
-							onDateSelect={handleDateSelect}
-							eventDates={eventDates}
-						/>
-					</div>
-
-					{/* Sidebar */}
-					<div className="space-y-6">
-						{/* Next Day Info */}
-						<NextDayInfo />
-
-						{/* Upcoming Appointments */}
-						<div className="glass-card p-6">
-							<h3 className="text-lg font-semibold mb-4 flex items-center gap-2">
-								<svg className="w-5 h-5 text-primary" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-									<path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2" />
-								</svg>
-								Appointments
-							</h3>
-
-							{appointments.length === 0 ? (
-								<p className="text-muted text-sm">No appointments yet. Click on a date to create one.</p>
-							) : (
-								<div className="space-y-3 max-h-64 overflow-y-auto">
-									{appointments.slice().reverse().map(apt => (
-										<div key={apt.id} className="bg-secondary rounded-xl p-4 group">
-											<div className="flex items-start justify-between gap-2">
-												<div className="flex-1 min-w-0">
-													<div className="font-medium text-foreground">
-														{apt.title}
-													</div>
-													<div className="text-xs text-primary mb-1">
-														{formatAppointmentDate(apt.date, apt.time, apt.endTime)}
-													</div>
-													{apt.note && (
-														<div className="text-xs text-muted truncate">
-															{apt.note}
-														</div>
-													)}
-												</div>
-												<button
-													onClick={() => handleDeleteAppointment(apt.id)}
-													className="p-1 rounded opacity-0 group-hover:opacity-100 hover:bg-glass transition-all text-muted hover:text-red-400"
-													aria-label="Delete appointment"
-												>
-													<svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-														<path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
-													</svg>
-												</button>
-											</div>
-										</div>
-									))}
-								</div>
-							)}
-						</div>
-					</div>
-				</div>
-			</main>
-
-			{/* Date Calculator Section - Separate from main calendar */}
-			<section className="max-w-3xl mx-auto mt-12 mb-8">
-				<DateCalculator />
-			</section>
-
-			{/* Appointment Modal */}
-			<AppointmentModal
-				isOpen={isModalOpen}
-				selectedDate={selectedDate}
-				onClose={() => setIsModalOpen(false)}
-				onSave={handleSaveAppointment}
-			/>
-		</div>
-	);
+            {/* CTA */}
+            <section className="border-t border-border bg-secondary/30">
+                <div className="max-w-6xl mx-auto px-4 sm:px-8 py-16 sm:py-20 text-center">
+                    <h2 className="text-2xl sm:text-3xl font-bold text-foreground mb-4">
+                        Ready to simplify your scheduling?
+                    </h2>
+                    <p className="text-muted mb-8 max-w-xl mx-auto">
+                        Join Calend and let others book meetings with you in seconds.
+                    </p>
+                    {session ? (
+                        <Link href="/dashboard" className="btn-primary text-base px-8 py-3">
+                            Go to Dashboard
+                        </Link>
+                    ) : (
+                        <Link href="/signup" className="btn-primary text-base px-8 py-3">
+                            Create Free Account
+                        </Link>
+                    )}
+                </div>
+            </section>
+        </div>
+    );
 }

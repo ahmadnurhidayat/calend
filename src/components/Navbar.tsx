@@ -29,15 +29,13 @@ export default function Navbar() {
     }, [isDark]);
 
     const navLinks = [
-        { href: '/', label: 'Calendar' },
         { href: '/age-calculator', label: 'Age Calculator' },
     ];
 
     return (
-        <nav className="sticky top-0 z-50 bg-background border-b border-border">
+        <nav className="sticky top-0 z-50 bg-background/80 backdrop-blur-lg border-b border-border">
             <div className="max-w-6xl mx-auto px-4 sm:px-8">
                 <div className="flex items-center justify-between h-16">
-                    {/* Logo */}
                     <Link href="/" className="flex items-center gap-2">
                         <div className="w-8 h-8 rounded-lg bg-primary flex items-center justify-center">
                             <svg className="w-4 h-4 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -47,7 +45,6 @@ export default function Navbar() {
                         <span className="text-lg font-semibold text-foreground">Calend</span>
                     </Link>
 
-                    {/* Center Navigation */}
                     <div className="hidden sm:flex items-center gap-1">
                         {navLinks.map(link => (
                             <Link
@@ -60,9 +57,7 @@ export default function Navbar() {
                         ))}
                     </div>
 
-                    {/* Right Actions */}
                     <div className="flex items-center gap-3">
-                        {/* Theme Toggle */}
                         <button
                             onClick={() => setIsDark(!isDark)}
                             className="p-2 rounded-lg hover:bg-secondary transition-all text-muted hover:text-foreground"
@@ -79,7 +74,6 @@ export default function Navbar() {
                             )}
                         </button>
 
-                        {/* Auth Buttons */}
                         {session ? (
                             <div className="flex items-center gap-2">
                                 <Link
@@ -96,9 +90,14 @@ export default function Navbar() {
                                 </button>
                             </div>
                         ) : (
-                            <Link href="/login" className="btn-primary text-sm py-2 px-4">
-                                Sign In
-                            </Link>
+                            <div className="flex items-center gap-2">
+                                <Link href="/login" className="btn-secondary text-sm py-2 px-3">
+                                    Sign In
+                                </Link>
+                                <Link href="/signup" className="btn-primary text-sm py-2 px-4">
+                                    Get Started
+                                </Link>
+                            </div>
                         )}
                     </div>
                 </div>

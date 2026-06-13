@@ -3,7 +3,7 @@
 import { useSession, signOut } from 'next-auth/react';
 import { useRouter } from 'next/navigation';
 import { useEffect, useState, useCallback } from 'react';
-import { supabase, Availability, Booking } from '@/lib/supabase';
+import { getSupabase, Availability, Booking } from '@/lib/supabase';
 
 export default function DashboardPage() {
     const { data: session, status } = useSession();
@@ -12,8 +12,10 @@ export default function DashboardPage() {
     const [bookings, setBookings] = useState<Booking[]>([]);
     const [username, setUsername] = useState('');
     const [copied, setCopied] = useState(false);
+    const [cancellingId, setCancellingId] = useState<string | null>(null);
 
     const loadUserData = useCallback(async () => {
+        const supabase = getSupabase();
         const { data: user } = await supabase
             .from('users')
             .select('id, username')
@@ -24,7 +26,6 @@ export default function DashboardPage() {
             setUsername(user.username);
         }
 
-        // Only fetch bookings and availability for the current user
         if (user?.id) {
             const { data: bookingsData } = await supabase
                 .from('bookings')
@@ -67,7 +68,31 @@ export default function DashboardPage() {
         setTimeout(() => setCopied(false), 2000);
     };
 
+    const handleCancelBooking = async (bookingId: string) => {
+        setCancellingId(bookingId);
+        try {
+            const res = await fetch('/api/book/cancel', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ bookingId }),
+            });
+
+            if (res.ok) {
+                setBookings(prev => prev.filter(b => b.id !== bookingId));
+            }
+        } catch {
+            // silent fail
+        }
+        setCancellingId(null);
+    };
+
     const dayNames = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'];
+    const hasAvailability = availability.some(a => a.is_active);
+    const hasBookings = bookings.length > 0;
+    const hasLink = !!username;
+
+    // Onboarding: show setup steps if user hasn't completed them
+    const showOnboarding = !hasAvailability && !hasBookings;
 
     if (status === 'loading') {
         return (
@@ -93,6 +118,55 @@ export default function DashboardPage() {
                     </button>
                 </div>
 
+                {/* Onboarding Banner */}
+                {showOnboarding && (
+                    <div className="glass-card p-6 mb-6 border-primary/30">
+                        <h2 className="font-semibold text-foreground mb-2">Get Started with Calend</h2>
+                        <p className="text-sm text-muted mb-4">
+                            Complete these steps to start receiving bookings:
+                        </p>
+                        <div className="space-y-3">
+                            <div className="flex items-center gap-3">
+                                <div className={`w-8 h-8 rounded-full flex items-center justify-center text-sm font-bold ${hasAvailability ? 'bg-green-500 text-white' : 'bg-primary text-white'}`}>
+                                    {hasAvailability ? (
+                                        <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
+                                        </svg>
+                                    ) : '1'}
+                                </div>
+                                <div className="flex-1">
+                                    <div className="text-sm font-medium text-foreground">Set your availability</div>
+                                    <div className="text-xs text-muted">Choose which days and hours you&apos;re available</div>
+                                </div>
+                                {!hasAvailability && (
+                                    <a href="/dashboard/availability" className="btn-primary text-sm py-1.5 px-3">
+                                        Set Up
+                                    </a>
+                                )}
+                            </div>
+                            <div className="flex items-center gap-3">
+                                <div className={`w-8 h-8 rounded-full flex items-center justify-center text-sm font-bold ${hasLink ? 'bg-green-500 text-white' : 'bg-primary text-white'}`}>
+                                    {hasLink ? (
+                                        <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
+                                        </svg>
+                                    ) : '2'}
+                                </div>
+                                <div className="flex-1">
+                                    <div className="text-sm font-medium text-foreground">Share your booking link</div>
+                                    <div className="text-xs text-muted">Send it to candidates so they can book with you</div>
+                                </div>
+                                {hasAvailability && !hasLink && (
+                                    <button onClick={copyBookingLink} className="btn-secondary text-sm py-1.5 px-3">
+                                        Copy Link
+                                    </button>
+                                )}
+                            </div>
+                        </div>
+                    </div>
+                )}
+
+                {/* Booking Link Card */}
                 <div className="glass-card p-6 mb-6">
                     <h2 className="font-semibold text-foreground mb-3">Your Booking Link</h2>
                     <div className="flex items-center gap-3">
@@ -115,28 +189,44 @@ export default function DashboardPage() {
                 </div>
 
                 <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+                    {/* Upcoming Bookings */}
                     <div className="glass-card p-6">
                         <h2 className="font-semibold text-foreground mb-4">Upcoming Bookings</h2>
                         {bookings.length === 0 ? (
-                            <p className="text-muted text-sm">No bookings yet.</p>
+                            <p className="text-muted text-sm">No bookings yet. Share your link to get started.</p>
                         ) : (
                             <div className="space-y-3 max-h-80 overflow-y-auto">
                                 {bookings.map(booking => (
-                                    <div key={booking.id} className="bg-secondary rounded-xl p-4">
-                                        <div className="font-medium text-foreground">{booking.candidate_name}</div>
-                                        <div className="text-xs text-primary">
-                                            {booking.date} at {booking.start_time} - {booking.end_time}
+                                    <div key={booking.id} className="bg-secondary rounded-xl p-4 group">
+                                        <div className="flex items-start justify-between gap-2">
+                                            <div className="flex-1 min-w-0">
+                                                <div className="font-medium text-foreground">{booking.candidate_name}</div>
+                                                <div className="text-xs text-primary">
+                                                    {booking.date} at {booking.start_time} - {booking.end_time}
+                                                </div>
+                                                <div className="text-xs text-muted">{booking.candidate_email}</div>
+                                                {booking.reason && (
+                                                    <div className="text-xs text-muted mt-1">{booking.reason}</div>
+                                                )}
+                                            </div>
+                                            <button
+                                                onClick={() => handleCancelBooking(booking.id)}
+                                                disabled={cancellingId === booking.id}
+                                                className="p-1 rounded opacity-0 group-hover:opacity-100 hover:bg-glass transition-all text-muted hover:text-red-400 disabled:opacity-50"
+                                                aria-label="Cancel booking"
+                                            >
+                                                <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                                                </svg>
+                                            </button>
                                         </div>
-                                        <div className="text-xs text-muted">{booking.candidate_email}</div>
-                                        {booking.reason && (
-                                            <div className="text-xs text-muted mt-1">{booking.reason}</div>
-                                        )}
                                     </div>
                                 ))}
                             </div>
                         )}
                     </div>
 
+                    {/* Availability */}
                     <div className="glass-card p-6">
                         <h2 className="font-semibold text-foreground mb-4">Your Availability</h2>
                         {availability.length === 0 ? (
@@ -155,7 +245,7 @@ export default function DashboardPage() {
                                     </div>
                                 ))}
                                 <a href="/dashboard/availability" className="text-primary text-sm hover:underline block mt-4">
-                                    Edit Availability →
+                                    Edit Availability &rarr;
                                 </a>
                             </div>
                         )}

@@ -4,6 +4,7 @@ import { authOptions } from '@/lib/auth';
 import { getSupabaseAdmin } from '@/lib/supabase-server';
 import { updateCalendarEvent } from '@/lib/google-calendar';
 import { sendRescheduleEmails } from '@/lib/emails';
+import { env } from '@/lib/env';
 
 interface HostRescheduleRequest {
     bookingId: string;
@@ -112,7 +113,7 @@ export async function PUT(request: NextRequest) {
         }
 
         // Send reschedule emails
-        const rescheduleUrl = `${process.env.NEXTAUTH_URL || 'https://calend.beyondyou.my.id'}/reschedule/${booking.reschedule_token}`;
+        const rescheduleUrl = `${env.nextAuthUrl}/reschedule/${booking.reschedule_token}`;
 
         try {
             await sendRescheduleEmails({

@@ -3,6 +3,7 @@ import { getSupabaseAdmin } from '@/lib/supabase-server';
 import { createCalendarEvent } from '@/lib/google-calendar';
 import { sendBookingEmails } from '@/lib/emails';
 import { checkRateLimit, RATE_LIMITS } from '@/lib/rate-limit';
+import { env } from '@/lib/env';
 import crypto from 'crypto';
 
 interface BookingRequest {
@@ -169,7 +170,7 @@ export async function POST(request: NextRequest) {
         try {
             const result = await createCalendarEvent(userId, {
                 title: eventTitle,
-                description: `${reason || `Scheduled via Calend`}\n\nCandidate: ${candidateName}\nEmail: ${candidateEmail}\n\nReschedule: ${process.env.NEXTAUTH_URL || 'https://calend.beyondyou.my.id'}/reschedule/${rescheduleToken}`,
+                description: `${reason || `Scheduled via Calend`}\n\nCandidate: ${candidateName}\nEmail: ${candidateEmail}\n\nReschedule: ${env.nextAuthUrl}/reschedule/${rescheduleToken}`,
                 startTime: gCalStart,
                 endTime: gCalEnd,
                 attendeeEmails,
@@ -226,7 +227,7 @@ export async function POST(request: NextRequest) {
         }
 
         // Send emails
-        const rescheduleUrl = `${process.env.NEXTAUTH_URL || 'https://calend.beyondyou.my.id'}/reschedule/${rescheduleToken}`;
+        const rescheduleUrl = `${env.nextAuthUrl}/reschedule/${rescheduleToken}`;
 
         // Get team member emails for notifications
         const teamMemberEmails: string[] = [];

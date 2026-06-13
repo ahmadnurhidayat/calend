@@ -1,6 +1,6 @@
 'use client';
 
-import { useSession, signOut } from 'next-auth/react';
+import { useSession } from 'next-auth/react';
 import { useRouter } from 'next/navigation';
 import { useEffect, useState, useCallback } from 'react';
 import { getSupabase, Availability, Booking } from '@/lib/supabase';
@@ -112,6 +112,13 @@ export default function DashboardPage() {
     const [copied, setCopied] = useState(false);
     const [cancellingId, setCancellingId] = useState<string | null>(null);
 
+    // Reschedule modal state
+    const [rescheduleBooking, setRescheduleBooking] = useState<Booking | null>(null);
+    const [rescheduleDate, setRescheduleDate] = useState<Date | null>(null);
+    const [rescheduleTime, setRescheduleTime] = useState('');
+    const [rescheduleLoading, setRescheduleLoading] = useState(false);
+    const [rescheduleError, setRescheduleError] = useState('');
+
     const bookingLink = typeof window !== 'undefined'
         ? `${window.location.origin}/book/${username}`
         : '';
@@ -216,6 +223,90 @@ export default function DashboardPage() {
     const shareViaLinkedIn = () => {
         const url = encodeURIComponent(bookingLink);
         window.open(`https://www.linkedin.com/sharing/share-offsite/?url=${url}`, '_blank');
+    };
+
+    const getRescheduleSlots = (date: Date) => {
+        const dayOfWeek = date.getDay();
+        const dayAvail = availability.find(a => a.day_of_week === dayOfWeek);
+        if (!dayAvail) return [];
+
+        const slots: { time: string; available: boolean }[] = [];
+        const [startHour, startMin] = dayAvail.start_time.split(':').map(Number);
+        const [endHour, endMin] = dayAvail.end_time.split(':').map(Number);
+        const dateStr = date.toISOString().split('T')[0];
+
+        const bookedRanges = bookings
+            .filter(b => b.date === dateStr && b.status !== 'cancelled' && b.id !== rescheduleBooking?.id)
+            .map(b => ({ start: b.start_time, end: b.end_time }));
+
+        for (let h = startHour; h < endHour || (h === endHour && 0 < endMin); h++) {
+            for (let m = 0; m < 60; m += 30) {
+                if (h === startHour && m < startMin) continue;
+                if (h === endHour && m >= endMin) break;
+
+                const timeStr = `${h.toString().padStart(2, '0')}:${m.toString().padStart(2, '0')}`;
+                const slotEndMin = h * 60 + m + 30;
+                const slotEnd = `${Math.floor(slotEndMin / 60).toString().padStart(2, '0')}:${(slotEndMin % 60).toString().padStart(2, '0')}`;
+                const isBooked = bookedRanges.some(r => r.start < slotEnd && r.end > timeStr);
+                slots.push({ time: timeStr, available: !isBooked });
+            }
+        }
+        return slots;
+    };
+
+    const handleReschedule = async () => {
+        if (!rescheduleBooking || !rescheduleDate || !rescheduleTime) {
+            setRescheduleError('Please select a date and time');
+            return;
+        }
+
+        setRescheduleLoading(true);
+        setRescheduleError('');
+
+        const [h, m] = rescheduleTime.split(':').map(Number);
+        const endMin = h * 60 + m + 30;
+        const endTime = `${Math.floor(endMin / 60).toString().padStart(2, '0')}:${(endMin % 60).toString().padStart(2, '0')}`;
+
+        try {
+            const res = await fetch('/api/book/host-reschedule', {
+                method: 'PUT',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                    bookingId: rescheduleBooking.id,
+                    date: rescheduleDate.toISOString().split('T')[0],
+                    startTime: rescheduleTime,
+                    endTime,
+                }),
+            });
+
+            if (res.ok) {
+                setBookings(prev => prev.map(b =>
+                    b.id === rescheduleBooking.id
+                        ? { ...b, date: rescheduleDate.toISOString().split('T')[0], start_time: rescheduleTime, end_time: endTime }
+                        : b
+                ));
+                setRescheduleBooking(null);
+                setRescheduleDate(null);
+                setRescheduleTime('');
+            } else {
+                const data = await res.json() as { error?: string };
+                setRescheduleError(data.error || 'Failed to reschedule');
+            }
+        } catch {
+            setRescheduleError('Failed to reschedule');
+        }
+        setRescheduleLoading(false);
+    };
+
+    const generateRescheduleDays = () => {
+        const today = new Date();
+        const days: Date[] = [];
+        for (let i = 0; i < 14; i++) {
+            const date = new Date(today);
+            date.setDate(today.getDate() + i);
+            days.push(date);
+        }
+        return days;
     };
 
     const hasAvailability = availability.some(a => a.is_active);
@@ -339,16 +430,32 @@ export default function DashboardPage() {
                                                         <div className="text-xs text-muted mt-1 italic">&ldquo;{booking.reason}&rdquo;</div>
                                                     )}
                                                 </div>
-                                                <button
-                                                    onClick={() => handleCancelBooking(booking.id)}
-                                                    disabled={cancellingId === booking.id}
-                                                    className="p-2 rounded-lg opacity-0 group-hover:opacity-100 hover:bg-red-500/10 transition-all text-muted hover:text-red-500 disabled:opacity-50"
-                                                    aria-label="Cancel booking"
-                                                >
-                                                    <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
-                                                    </svg>
-                                                </button>
+                                                <div className="flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-all">
+                                                    <button
+                                                        onClick={() => {
+                                                            setRescheduleBooking(booking);
+                                                            setRescheduleDate(null);
+                                                            setRescheduleTime('');
+                                                            setRescheduleError('');
+                                                        }}
+                                                        className="p-2 rounded-lg hover:bg-primary/10 transition-all text-muted hover:text-primary"
+                                                        aria-label="Reschedule booking"
+                                                    >
+                                                        <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z" />
+                                                        </svg>
+                                                    </button>
+                                                    <button
+                                                        onClick={() => handleCancelBooking(booking.id)}
+                                                        disabled={cancellingId === booking.id}
+                                                        className="p-2 rounded-lg hover:bg-red-500/10 transition-all text-muted hover:text-red-500 disabled:opacity-50"
+                                                        aria-label="Cancel booking"
+                                                    >
+                                                        <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
+                                                        </svg>
+                                                    </button>
+                                                </div>
                                             </div>
                                         </div>
                                     ))}
@@ -519,6 +626,89 @@ export default function DashboardPage() {
                     </div>
                 </div>
             </div>
+
+            {/* Reschedule Modal */}
+            {rescheduleBooking && (
+                <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4" onClick={() => setRescheduleBooking(null)}>
+                    <div className="glass-card p-6 max-w-md w-full max-h-[90vh] overflow-y-auto" onClick={e => e.stopPropagation()}>
+                        <div className="flex items-center justify-between mb-4">
+                            <h2 className="font-semibold text-foreground">Reschedule Booking</h2>
+                            <button onClick={() => setRescheduleBooking(null)} className="text-muted hover:text-foreground">
+                                <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                                </svg>
+                            </button>
+                        </div>
+
+                        <div className="bg-secondary/50 rounded-lg p-3 mb-4">
+                            <p className="text-sm font-medium text-foreground">{rescheduleBooking.candidate_name}</p>
+                            <p className="text-xs text-muted">{rescheduleBooking.date} at {rescheduleBooking.start_time} - {rescheduleBooking.end_time}</p>
+                        </div>
+
+                        {/* Date Picker */}
+                        <div className="mb-4">
+                            <label className="block text-sm text-muted mb-2">New Date</label>
+                            <div className="flex gap-1.5 overflow-x-auto pb-2">
+                                {generateRescheduleDays().map(date => {
+                                    const slots = getRescheduleSlots(date);
+                                    const hasSlots = slots.some(s => s.available);
+                                    const isSelected = rescheduleDate?.toDateString() === date.toDateString();
+                                    return (
+                                        <button
+                                            key={date.toISOString()}
+                                            onClick={() => { setRescheduleDate(date); setRescheduleTime(''); }}
+                                            disabled={!hasSlots}
+                                            className={`flex-shrink-0 p-2 rounded-lg text-center transition-all text-xs ${isSelected
+                                                ? 'bg-primary text-white'
+                                                : hasSlots
+                                                    ? 'bg-secondary hover:bg-primary/20'
+                                                    : 'opacity-50 cursor-not-allowed'
+                                                }`}
+                                        >
+                                            <div>{dayNames[date.getDay()].slice(0, 2)}</div>
+                                            <div className="font-bold">{date.getDate()}</div>
+                                        </button>
+                                    );
+                                })}
+                            </div>
+                        </div>
+
+                        {/* Time Picker */}
+                        {rescheduleDate && (
+                            <div className="mb-4">
+                                <label className="block text-sm text-muted mb-2">New Time</label>
+                                <div className="grid grid-cols-4 gap-1.5 max-h-40 overflow-y-auto">
+                                    {getRescheduleSlots(rescheduleDate).map(slot => (
+                                        <button
+                                            key={slot.time}
+                                            onClick={() => setRescheduleTime(slot.time)}
+                                            disabled={!slot.available}
+                                            className={`p-2 rounded-lg text-xs font-medium transition-all ${rescheduleTime === slot.time
+                                                ? 'bg-primary text-white'
+                                                : slot.available
+                                                    ? 'bg-secondary hover:bg-primary/20'
+                                                    : 'opacity-50 cursor-not-allowed line-through'
+                                                }`}
+                                        >
+                                            {slot.time}
+                                        </button>
+                                    ))}
+                                </div>
+                            </div>
+                        )}
+
+                        {rescheduleError && <p className="text-red-500 text-sm mb-3">{rescheduleError}</p>}
+
+                        <button
+                            onClick={handleReschedule}
+                            disabled={rescheduleLoading || !rescheduleDate || !rescheduleTime}
+                            className="btn-primary w-full disabled:opacity-50"
+                        >
+                            {rescheduleLoading ? 'Rescheduling...' : 'Confirm Reschedule'}
+                        </button>
+                    </div>
+                </div>
+            )}
         </div>
     );
 }

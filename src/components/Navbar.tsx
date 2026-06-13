@@ -66,6 +66,16 @@ export default function Navbar() {
                                 >
                                     Availability
                                 </Link>
+                                <Link
+                                    href="/dashboard/teams"
+                                    className={`px-3 py-2 rounded-lg text-sm font-medium transition-colors ${
+                                        isActive('/dashboard/teams')
+                                            ? 'bg-primary/10 text-primary'
+                                            : 'text-muted hover:text-foreground hover:bg-secondary'
+                                    }`}
+                                >
+                                    Teams
+                                </Link>
                             </>
                         ) : (
                             <Link href="/age-calculator" className="text-sm text-muted hover:text-foreground px-3 py-2 rounded-lg hover:bg-secondary transition-colors">

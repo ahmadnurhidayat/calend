@@ -1,4 +1,5 @@
 import { Resend } from 'resend';
+import { canSendEmail, recordEmailSend } from './email-rate-limit';
 
 let resend: Resend;
 
@@ -90,6 +91,12 @@ function buildHostEmail(params: SendBookingEmailsParams): string {
 export async function sendBookingEmails(params: SendBookingEmailsParams): Promise<void> {
     const fromEmail = process.env.EMAIL_FROM || 'Calend <onboarding@resend.dev>';
 
+    const allowed = await canSendEmail(params.candidateEmail);
+    if (!allowed) {
+        console.log(`Email rate limit reached for ${params.candidateEmail}, skipping emails`);
+        return;
+    }
+
     const promises: Promise<unknown>[] = [
         // Email to candidate
         getResend().emails.send({
@@ -122,4 +129,5 @@ export async function sendBookingEmails(params: SendBookingEmailsParams): Promis
     }
 
     await Promise.allSettled(promises);
+    await recordEmailSend(params.candidateEmail);
 }

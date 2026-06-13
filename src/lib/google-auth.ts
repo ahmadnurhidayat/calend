@@ -1,4 +1,5 @@
 import { getSupabaseAdmin } from './supabase-server';
+import { env } from './env';
 
 interface GoogleTokenResponse {
     access_token: string;
@@ -49,8 +50,8 @@ export async function getValidGoogleToken(userId: string): Promise<string | null
         return null;
     }
 
-    const clientId = process.env.GOOGLE_CLIENT_ID;
-    const clientSecret = process.env.GOOGLE_CLIENT_SECRET;
+    const clientId = env.googleClientId;
+    const clientSecret = env.googleClientSecret;
 
     if (!clientId || !clientSecret) {
         return null;
@@ -99,8 +100,8 @@ export async function getGoogleAuth(userId: string) {
     }
 
     const oauth2Client = new google.auth.OAuth2(
-        process.env.GOOGLE_CLIENT_ID,
-        process.env.GOOGLE_CLIENT_SECRET
+        env.googleClientId,
+        env.googleClientSecret
     );
 
     oauth2Client.setCredentials({ access_token: accessToken });

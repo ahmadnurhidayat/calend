@@ -3,12 +3,13 @@ import CredentialsProvider from 'next-auth/providers/credentials';
 import { getSupabaseAdmin } from '@/lib/supabase-server';
 import { compare } from 'bcryptjs';
 import type { NextAuthOptions } from 'next-auth';
+import { env } from './env';
 
 export const authOptions: NextAuthOptions = {
     providers: [
         GoogleProvider({
-            clientId: process.env.GOOGLE_CLIENT_ID!,
-            clientSecret: process.env.GOOGLE_CLIENT_SECRET!,
+            clientId: env.googleClientId,
+            clientSecret: env.googleClientSecret,
             authorization: {
                 params: {
                     scope: 'openid email profile https://www.googleapis.com/auth/calendar',
@@ -108,5 +109,5 @@ export const authOptions: NextAuthOptions = {
     pages: {
         signIn: '/login',
     },
-    secret: process.env.NEXTAUTH_SECRET,
+    secret: env.nextAuthSecret,
 };

@@ -75,9 +75,9 @@ export default function BookingPage({ params }: { params: Promise<{ username: st
         const [endHour, endMin] = dayAvail.end_time.split(':').map(Number);
 
         const dateStr = date.toISOString().split('T')[0];
-        const bookedTimes = bookings
-            .filter(b => b.date === dateStr)
-            .map(b => b.start_time);
+        const bookedRanges = bookings
+            .filter(b => b.date === dateStr && b.status !== 'cancelled')
+            .map(b => ({ start: b.start_time, end: b.end_time }));
 
         for (let h = startHour; h < endHour || (h === endHour && 0 < endMin); h++) {
             for (let m = 0; m < 60; m += 30) {
@@ -85,9 +85,11 @@ export default function BookingPage({ params }: { params: Promise<{ username: st
                 if (h === endHour && m >= endMin) break;
 
                 const timeStr = `${h.toString().padStart(2, '0')}:${m.toString().padStart(2, '0')}`;
+                const slotEnd = addMinutes(timeStr, 30);
+                const isBooked = bookedRanges.some(r => r.start < slotEnd && r.end > timeStr);
                 slots.push({
                     time: timeStr,
-                    available: !bookedTimes.includes(timeStr),
+                    available: !isBooked,
                 });
             }
         }

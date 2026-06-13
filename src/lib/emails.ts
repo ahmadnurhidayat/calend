@@ -1,6 +1,13 @@
 import { Resend } from 'resend';
 
-const resend = new Resend(process.env.RESEND_API_KEY);
+let resend: Resend;
+
+function getResend(): Resend {
+    if (!resend) {
+        resend = new Resend(process.env.RESEND_API_KEY);
+    }
+    return resend;
+}
 
 interface SendBookingEmailsParams {
     candidateName: string;
@@ -85,14 +92,14 @@ export async function sendBookingEmails(params: SendBookingEmailsParams): Promis
 
     const promises: Promise<unknown>[] = [
         // Email to candidate
-        resend.emails.send({
+        getResend().emails.send({
             from: fromEmail,
             to: params.candidateEmail,
             subject: `Booking Confirmed: ${params.eventTitle} with ${params.hostName}`,
             html: buildConfirmationEmail(params),
         }),
         // Email to host
-        resend.emails.send({
+        getResend().emails.send({
             from: fromEmail,
             to: params.hostEmail,
             subject: `New Booking: ${params.candidateName} - ${params.eventTitle}`,
@@ -104,7 +111,7 @@ export async function sendBookingEmails(params: SendBookingEmailsParams): Promis
     if (params.teamMemberEmails && params.teamMemberEmails.length > 0) {
         for (const email of params.teamMemberEmails) {
             promises.push(
-                resend.emails.send({
+                getResend().emails.send({
                     from: fromEmail,
                     to: email,
                     subject: `Team Booking: ${params.candidateName} - ${params.eventTitle}`,

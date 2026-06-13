@@ -28,9 +28,7 @@ export default function Navbar() {
         localStorage.setItem('theme', isDark ? 'dark' : 'light');
     }, [isDark]);
 
-    const navLinks = [
-        { href: '/age-calculator', label: 'Age Calculator' },
-    ];
+    const isActive = (href: string) => pathname === href;
 
     return (
         <nav className="sticky top-0 z-50 bg-background/80 backdrop-blur-lg border-b border-border">
@@ -46,15 +44,34 @@ export default function Navbar() {
                     </Link>
 
                     <div className="hidden sm:flex items-center gap-1">
-                        {navLinks.map(link => (
-                            <Link
-                                key={link.href}
-                                href={link.href}
-                                className={`nav-link text-sm ${pathname === link.href ? 'active text-foreground' : ''}`}
-                            >
-                                {link.label}
+                        {session ? (
+                            <>
+                                <Link
+                                    href="/dashboard"
+                                    className={`px-3 py-2 rounded-lg text-sm font-medium transition-colors ${
+                                        isActive('/dashboard')
+                                            ? 'bg-primary/10 text-primary'
+                                            : 'text-muted hover:text-foreground hover:bg-secondary'
+                                    }`}
+                                >
+                                    Dashboard
+                                </Link>
+                                <Link
+                                    href="/dashboard/availability"
+                                    className={`px-3 py-2 rounded-lg text-sm font-medium transition-colors ${
+                                        isActive('/dashboard/availability')
+                                            ? 'bg-primary/10 text-primary'
+                                            : 'text-muted hover:text-foreground hover:bg-secondary'
+                                    }`}
+                                >
+                                    Availability
+                                </Link>
+                            </>
+                        ) : (
+                            <Link href="/age-calculator" className="text-sm text-muted hover:text-foreground px-3 py-2 rounded-lg hover:bg-secondary transition-colors">
+                                Age Calculator
                             </Link>
-                        ))}
+                        )}
                     </div>
 
                     <div className="flex items-center gap-3">
@@ -76,15 +93,9 @@ export default function Navbar() {
 
                         {session ? (
                             <div className="flex items-center gap-2">
-                                <Link
-                                    href="/dashboard"
-                                    className={`nav-link text-sm ${pathname === '/dashboard' ? 'active text-foreground' : ''}`}
-                                >
-                                    Dashboard
-                                </Link>
                                 <button
                                     onClick={() => signOut({ callbackUrl: '/' })}
-                                    className="btn-secondary text-sm py-2 px-3"
+                                    className="text-sm text-muted hover:text-foreground px-3 py-2 rounded-lg hover:bg-secondary transition-colors"
                                 >
                                     Logout
                                 </button>

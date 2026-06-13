@@ -89,15 +89,16 @@ export async function POST(request: NextRequest) {
             }, { status: 429 });
         }
 
-        // Check slot availability
+        // Check slot availability (range overlap — prevents race conditions)
         const { data: existing } = await supabase
             .from('bookings')
             .select('id')
             .eq('user_id', userId)
+            .lt('start_time', endTime)
+            .gt('end_time', startTime)
             .eq('date', date)
-            .eq('start_time', startTime)
             .neq('status', 'cancelled')
-            .single();
+            .maybeSingle();
 
         if (existing) {
             return NextResponse.json({ error: 'This time slot is no longer available' }, { status: 409 });

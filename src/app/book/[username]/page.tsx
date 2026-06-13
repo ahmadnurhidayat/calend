@@ -1,7 +1,7 @@
 'use client';
 
 import { useState, useEffect, use, useCallback } from 'react';
-import { supabase, User, Availability, Booking } from '@/lib/supabase';
+import { getSupabase, User, Availability, Booking } from '@/lib/supabase';
 
 interface TimeSlot {
     time: string;
@@ -24,6 +24,7 @@ export default function BookingPage({ params }: { params: Promise<{ username: st
     const [error, setError] = useState('');
 
     const loadRecruiterData = useCallback(async () => {
+        const supabase = getSupabase();
         const { data: user } = await supabase
             .from('users')
             .select('*')
@@ -183,9 +184,9 @@ export default function BookingPage({ params }: { params: Promise<{ username: st
                     </div>
                     <h1 className="text-2xl font-bold text-foreground mb-2">Booking Confirmed!</h1>
                     <p className="text-muted mb-4">
-                        Your appointment with {recruiter.name} has been scheduled. A calendar invite has been sent to your email.
+                        Your meeting with {recruiter.name} has been scheduled. You&apos;ll receive a confirmation at {candidateEmail}.
                     </p>
-                    <p className="text-sm text-primary">
+                    <p className="text-sm text-primary font-medium">
                         {selectedDate?.toLocaleDateString('en-US', { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' })} at {selectedTime}
                     </p>
                 </div>

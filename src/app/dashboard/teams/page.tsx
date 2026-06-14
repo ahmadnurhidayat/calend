@@ -32,9 +32,12 @@ export default function TeamsPage() {
     const [members, setMembers] = useState<TeamMember[]>([]);
     const [currentUserRole, setCurrentUserRole] = useState<string>('');
     const [showCreateModal, setShowCreateModal] = useState(false);
+    const [showEditModal, setShowEditModal] = useState(false);
     const [showAddMemberModal, setShowAddMemberModal] = useState(false);
     const [newTeamName, setNewTeamName] = useState('');
     const [newTeamSlug, setNewTeamSlug] = useState('');
+    const [editTeamName, setEditTeamName] = useState('');
+    const [editTeamSlug, setEditTeamSlug] = useState('');
     const [newMemberEmail, setNewMemberEmail] = useState('');
     const [loading, setLoading] = useState(false);
     const [error, setError] = useState('');
@@ -115,6 +118,70 @@ export default function TeamsPage() {
         }
     };
 
+    const updateTeam = async () => {
+        if (!selectedTeam || !editTeamName || !editTeamSlug) {
+            setError('Name and slug are required');
+            return;
+        }
+
+        setLoading(true);
+        setError('');
+
+        try {
+            const res = await fetch('/api/teams', {
+                method: 'PUT',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ id: selectedTeam.id, name: editTeamName, slug: editTeamSlug }),
+            });
+
+            const data = await res.json() as { team?: Team; error?: string };
+
+            if (!res.ok) {
+                setError(data.error || 'Failed to update team');
+                return;
+            }
+
+            if (data.team) {
+                setTeams(teams.map(t => t.id === selectedTeam.id ? { ...t, name: editTeamName, slug: editTeamSlug } : t));
+                setSelectedTeam({ ...selectedTeam, name: editTeamName, slug: editTeamSlug });
+            }
+            setShowEditModal(false);
+        } catch {
+            setError('Failed to update team');
+        } finally {
+            setLoading(false);
+        }
+    };
+
+    const deleteTeam = async () => {
+        if (!selectedTeam) return;
+        if (!confirm('Are you sure you want to delete this team? This cannot be undone.')) return;
+
+        setLoading(true);
+        setError('');
+
+        try {
+            const res = await fetch('/api/teams', {
+                method: 'DELETE',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ id: selectedTeam.id }),
+            });
+
+            if (!res.ok) {
+                const data = await res.json() as { error?: string };
+                setError(data.error || 'Failed to delete team');
+                return;
+            }
+
+            setTeams(teams.filter(t => t.id !== selectedTeam.id));
+            setSelectedTeam(null);
+        } catch {
+            setError('Failed to delete team');
+        } finally {
+            setLoading(false);
+        }
+    };
+
     const addMember = async () => {
         if (!newMemberEmail || !selectedTeam) {
             setError('Email is required');
@@ -171,7 +238,7 @@ export default function TeamsPage() {
     };
 
     if (status === 'loading') {
-        return <div className="min-h-screen flex items-center justify-center">Loading...</div>;
+        return <div className="flex-1 flex items-center justify-center text-muted">Loading...</div>;
     }
 
     if (!session) {
@@ -179,23 +246,23 @@ export default function TeamsPage() {
     }
 
     return (
-        <div className="min-h-screen bg-gray-50">
-            <div className="max-w-7xl mx-auto px-4 py-8">
+        <div className="p-4 sm:p-8">
+            <div className="max-w-6xl mx-auto">
                 <div className="flex items-center justify-between mb-8">
                     <div>
-                        <h1 className="text-2xl font-bold text-gray-900">Teams</h1>
-                        <p className="text-gray-600 mt-1">Manage your teams and members</p>
+                        <h1 className="text-2xl font-bold text-foreground">Teams</h1>
+                        <p className="text-muted mt-1">Manage your teams and members</p>
                     </div>
                     <button
                         onClick={() => setShowCreateModal(true)}
-                        className="bg-[#1A5D5C] text-white px-4 py-2 rounded-lg hover:bg-[#154948] transition-colors"
+                        className="btn-primary"
                     >
                         Create Team
                     </button>
                 </div>
 
                 {error && (
-                    <div className="bg-red-50 text-red-700 p-4 rounded-lg mb-6">
+                    <div className="bg-red-500/10 text-red-500 p-4 rounded-lg mb-6">
                         {error}
                     </div>
                 )}
@@ -203,13 +270,13 @@ export default function TeamsPage() {
                 <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
                     {/* Team List */}
                     <div className="lg:col-span-1">
-                        <div className="bg-white rounded-lg shadow-sm border border-gray-200">
-                            <div className="p-4 border-b border-gray-200">
-                                <h2 className="font-semibold text-gray-900">Your Teams</h2>
+                        <div className="glass-card">
+                            <div className="p-4 border-b border-border">
+                                <h2 className="font-semibold text-foreground">Your Teams</h2>
                             </div>
-                            <div className="divide-y divide-gray-200">
+                            <div className="divide-y divide-border">
                                 {teams.length === 0 ? (
-                                    <div className="p-4 text-gray-500 text-center">
+                                    <div className="p-4 text-muted text-center">
                                         No teams yet. Create one to get started.
                                     </div>
                                 ) : (
@@ -217,13 +284,15 @@ export default function TeamsPage() {
                                         <button
                                             key={team.id}
                                             onClick={() => setSelectedTeam(team)}
-                                            className={`w-full p-4 text-left hover:bg-gray-50 transition-colors ${
-                                                selectedTeam?.id === team.id ? 'bg-gray-50' : ''
+                                            className={`w-full p-4 text-left transition-colors ${
+                                                selectedTeam?.id === team.id
+                                                    ? 'bg-primary/10'
+                                                    : 'hover:bg-secondary'
                                             }`}
                                         >
-                                            <div className="font-medium text-gray-900">{team.name}</div>
-                                            <div className="text-sm text-gray-500">/{team.slug}</div>
-                                            <div className="text-xs text-gray-400 mt-1">
+                                            <div className="font-medium text-foreground">{team.name}</div>
+                                            <div className="text-sm text-muted">/{team.slug}</div>
+                                            <div className="text-xs text-muted mt-1">
                                                 Role: {team.role}
                                             </div>
                                         </button>
@@ -236,53 +305,65 @@ export default function TeamsPage() {
                     {/* Team Details */}
                     <div className="lg:col-span-2">
                         {selectedTeam ? (
-                            <div className="bg-white rounded-lg shadow-sm border border-gray-200">
-                                <div className="p-4 border-b border-gray-200 flex items-center justify-between">
+                            <div className="glass-card">
+                                <div className="p-4 border-b border-border flex items-center justify-between">
                                     <div>
-                                        <h2 className="font-semibold text-gray-900">{selectedTeam.name}</h2>
-                                        <div className="text-sm text-gray-500">/{selectedTeam.slug}</div>
+                                        <h2 className="font-semibold text-foreground">{selectedTeam.name}</h2>
+                                        <div className="text-sm text-muted">/{selectedTeam.slug}</div>
                                     </div>
                                     <div className="flex items-center gap-2">
+                                        {currentUserRole === 'admin' && (
+                                            <button
+                                                onClick={() => {
+                                                    setEditTeamName(selectedTeam.name);
+                                                    setEditTeamSlug(selectedTeam.slug);
+                                                    setShowEditModal(true);
+                                                }}
+                                                className="btn-secondary text-sm py-1.5 px-3"
+                                            >
+                                                Edit
+                                            </button>
+                                        )}
                                         <button
                                             onClick={() => setShowAddMemberModal(true)}
-                                            className="bg-[#1A5D5C] text-white px-3 py-1.5 rounded-lg text-sm hover:bg-[#154948] transition-colors"
+                                            className="btn-primary text-sm py-1.5 px-3"
                                         >
                                             Add Member
                                         </button>
                                         <a
-                                            href={`/book/team/${selectedTeam.slug}`}
+                                            href={`/book/team/${encodeURIComponent(selectedTeam.slug)}`}
                                             target="_blank"
                                             rel="noopener noreferrer"
-                                            className="text-[#1A5D5C] hover:underline text-sm"
+                                            className="text-primary hover:underline text-sm"
                                         >
-                                            View Booking Page
+                                            Booking Page
                                         </a>
                                     </div>
                                 </div>
 
                                 <div className="p-4">
-                                    <h3 className="font-medium text-gray-900 mb-4">Members ({members.length})</h3>
-                                    <div className="divide-y divide-gray-200">
+                                    <h3 className="font-medium text-foreground mb-4">Members ({members.length})</h3>
+                                    <div className="divide-y divide-border">
                                         {members.map((member) => (
                                             <div key={member.id} className="py-3 flex items-center justify-between">
                                                 <div>
-                                                    <div className="font-medium text-gray-900">
+                                                    <div className="font-medium text-foreground">
                                                         {member.users?.name || member.users?.email}
                                                     </div>
-                                                    <div className="text-sm text-gray-500">{member.users?.email}</div>
+                                                    <div className="text-sm text-muted">{member.users?.email}</div>
                                                 </div>
                                                 <div className="flex items-center gap-3">
                                                     <span className={`px-2 py-1 text-xs rounded-full ${
                                                         member.role === 'admin'
-                                                            ? 'bg-purple-100 text-purple-700'
-                                                            : 'bg-gray-100 text-gray-700'
+                                                            ? 'bg-primary/10 text-primary'
+                                                            : 'bg-secondary text-muted'
                                                     }`}>
                                                         {member.role}
                                                     </span>
                                                     {currentUserRole === 'admin' && member.role !== 'admin' && (
                                                         <button
                                                             onClick={() => removeMember(member.id)}
-                                                            className="text-red-600 hover:text-red-800 text-sm"
+                                                            className="text-red-500 hover:text-red-400 text-sm"
                                                         >
                                                             Remove
                                                         </button>
@@ -294,7 +375,7 @@ export default function TeamsPage() {
                                 </div>
                             </div>
                         ) : (
-                            <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-8 text-center text-gray-500">
+                            <div className="glass-card p-8 text-center text-muted">
                                 Select a team to view details
                             </div>
                         )}
@@ -304,12 +385,12 @@ export default function TeamsPage() {
 
             {/* Create Team Modal */}
             {showCreateModal && (
-                <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
-                    <div className="bg-white rounded-lg p-6 w-full max-w-md">
-                        <h2 className="text-lg font-semibold mb-4">Create Team</h2>
+                <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4" onClick={() => setShowCreateModal(false)}>
+                    <div className="glass-card p-6 w-full max-w-md" onClick={e => e.stopPropagation()}>
+                        <h2 className="text-lg font-semibold text-foreground mb-4">Create Team</h2>
                         <div className="space-y-4">
                             <div>
-                                <label className="block text-sm font-medium text-gray-700 mb-1">Team Name</label>
+                                <label className="block text-sm text-muted mb-1">Team Name</label>
                                 <input
                                     type="text"
                                     value={newTeamName}
@@ -317,36 +398,29 @@ export default function TeamsPage() {
                                         setNewTeamName(e.target.value);
                                         setNewTeamSlug(e.target.value.toLowerCase().replace(/[^a-z0-9-]/g, '-'));
                                     }}
-                                    className="w-full border border-gray-300 rounded-lg px-3 py-2 focus:outline-none focus:ring-2 focus:ring-[#1A5D5C]"
+                                    className="input-field w-full"
                                     placeholder="My Team"
                                 />
                             </div>
                             <div>
-                                <label className="block text-sm font-medium text-gray-700 mb-1">Slug</label>
+                                <label className="block text-sm text-muted mb-1">Slug</label>
                                 <input
                                     type="text"
                                     value={newTeamSlug}
                                     onChange={(e) => setNewTeamSlug(e.target.value)}
-                                    className="w-full border border-gray-300 rounded-lg px-3 py-2 focus:outline-none focus:ring-2 focus:ring-[#1A5D5C]"
+                                    className="input-field w-full"
                                     placeholder="my-team"
                                 />
-                                <p className="text-xs text-gray-500 mt-1">
+                                <p className="text-xs text-muted mt-1">
                                     Booking URL: /book/team/{newTeamSlug || 'team-slug'}
                                 </p>
                             </div>
                         </div>
                         <div className="flex justify-end gap-3 mt-6">
-                            <button
-                                onClick={() => setShowCreateModal(false)}
-                                className="px-4 py-2 text-gray-700 hover:bg-gray-100 rounded-lg"
-                            >
+                            <button onClick={() => setShowCreateModal(false)} className="btn-secondary">
                                 Cancel
                             </button>
-                            <button
-                                onClick={createTeam}
-                                disabled={loading}
-                                className="px-4 py-2 bg-[#1A5D5C] text-white rounded-lg hover:bg-[#154948] disabled:opacity-50"
-                            >
+                            <button onClick={createTeam} disabled={loading} className="btn-primary disabled:opacity-50">
                                 {loading ? 'Creating...' : 'Create'}
                             </button>
                         </div>
@@ -354,36 +428,74 @@ export default function TeamsPage() {
                 </div>
             )}
 
+            {/* Edit Team Modal */}
+            {showEditModal && selectedTeam && (
+                <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4" onClick={() => setShowEditModal(false)}>
+                    <div className="glass-card p-6 w-full max-w-md" onClick={e => e.stopPropagation()}>
+                        <h2 className="text-lg font-semibold text-foreground mb-4">Edit Team</h2>
+                        <div className="space-y-4">
+                            <div>
+                                <label className="block text-sm text-muted mb-1">Team Name</label>
+                                <input
+                                    type="text"
+                                    value={editTeamName}
+                                    onChange={(e) => setEditTeamName(e.target.value)}
+                                    className="input-field w-full"
+                                />
+                            </div>
+                            <div>
+                                <label className="block text-sm text-muted mb-1">Slug</label>
+                                <input
+                                    type="text"
+                                    value={editTeamSlug}
+                                    onChange={(e) => setEditTeamSlug(e.target.value)}
+                                    className="input-field w-full"
+                                />
+                                <p className="text-xs text-muted mt-1">
+                                    Booking URL: /book/team/{editTeamSlug}
+                                </p>
+                            </div>
+                        </div>
+                        <div className="flex justify-between mt-6">
+                            <button onClick={deleteTeam} disabled={loading} className="text-red-500 hover:text-red-400 text-sm disabled:opacity-50">
+                                Delete Team
+                            </button>
+                            <div className="flex gap-3">
+                                <button onClick={() => setShowEditModal(false)} className="btn-secondary">
+                                    Cancel
+                                </button>
+                                <button onClick={updateTeam} disabled={loading} className="btn-primary disabled:opacity-50">
+                                    {loading ? 'Saving...' : 'Save'}
+                                </button>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            )}
+
             {/* Add Member Modal */}
             {showAddMemberModal && (
-                <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
-                    <div className="bg-white rounded-lg p-6 w-full max-w-md">
-                        <h2 className="text-lg font-semibold mb-4">Add Member</h2>
+                <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4" onClick={() => setShowAddMemberModal(false)}>
+                    <div className="glass-card p-6 w-full max-w-md" onClick={e => e.stopPropagation()}>
+                        <h2 className="text-lg font-semibold text-foreground mb-4">Add Member</h2>
                         <div>
-                            <label className="block text-sm font-medium text-gray-700 mb-1">Email</label>
+                            <label className="block text-sm text-muted mb-1">Email</label>
                             <input
                                 type="email"
                                 value={newMemberEmail}
                                 onChange={(e) => setNewMemberEmail(e.target.value)}
-                                className="w-full border border-gray-300 rounded-lg px-3 py-2 focus:outline-none focus:ring-2 focus:ring-[#1A5D5C]"
+                                className="input-field w-full"
                                 placeholder="member@example.com"
                             />
-                            <p className="text-xs text-gray-500 mt-1">
+                            <p className="text-xs text-muted mt-1">
                                 The user must already have an account
                             </p>
                         </div>
                         <div className="flex justify-end gap-3 mt-6">
-                            <button
-                                onClick={() => setShowAddMemberModal(false)}
-                                className="px-4 py-2 text-gray-700 hover:bg-gray-100 rounded-lg"
-                            >
+                            <button onClick={() => setShowAddMemberModal(false)} className="btn-secondary">
                                 Cancel
                             </button>
-                            <button
-                                onClick={addMember}
-                                disabled={loading}
-                                className="px-4 py-2 bg-[#1A5D5C] text-white rounded-lg hover:bg-[#154948] disabled:opacity-50"
-                            >
+                            <button onClick={addMember} disabled={loading} className="btn-primary disabled:opacity-50">
                                 {loading ? 'Adding...' : 'Add'}
                             </button>
                         </div>

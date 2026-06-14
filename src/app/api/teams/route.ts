@@ -113,3 +113,113 @@ export async function POST(request: NextRequest) {
         return NextResponse.json({ error: 'Internal server error' }, { status: 500 });
     }
 }
+
+export async function PUT(request: NextRequest) {
+    try {
+        const session = await getServerSession(authOptions);
+        if (!session?.user?.email) {
+            return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+        }
+
+        const body = await request.json() as { id: string; name: string; slug: string };
+        const { id, name, slug } = body;
+
+        if (!id || !name || !slug) {
+            return NextResponse.json({ error: 'ID, name, and slug are required' }, { status: 400 });
+        }
+
+        if (!/^[a-z0-9-]+$/.test(slug)) {
+            return NextResponse.json({ error: 'Slug must be lowercase alphanumeric with hyphens' }, { status: 400 });
+        }
+
+        const supabase = getSupabaseAdmin();
+        const { data: user } = await supabase
+            .from('users')
+            .select('id')
+            .eq('email', session.user.email)
+            .single();
+
+        if (!user) {
+            return NextResponse.json({ error: 'User not found' }, { status: 404 });
+        }
+
+        const { data: membership } = await supabase
+            .from('team_members')
+            .select('role')
+            .eq('team_id', id)
+            .eq('user_id', user.id)
+            .single();
+
+        if (!membership || membership.role !== 'admin') {
+            return NextResponse.json({ error: 'Only admins can edit teams' }, { status: 403 });
+        }
+
+        const { data: team, error: teamError } = await supabase
+            .from('teams')
+            .update({ name, slug })
+            .eq('id', id)
+            .select()
+            .single();
+
+        if (teamError) {
+            if (teamError.code === '23505') {
+                return NextResponse.json({ error: 'A team with this slug already exists' }, { status: 409 });
+            }
+            return NextResponse.json({ error: teamError.message }, { status: 500 });
+        }
+
+        return NextResponse.json({ team });
+    } catch (error) {
+        console.error('Update team error:', error);
+        return NextResponse.json({ error: 'Internal server error' }, { status: 500 });
+    }
+}
+
+export async function DELETE(request: NextRequest) {
+    try {
+        const session = await getServerSession(authOptions);
+        if (!session?.user?.email) {
+            return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+        }
+
+        const body = await request.json() as { id: string };
+        const { id } = body;
+
+        if (!id) {
+            return NextResponse.json({ error: 'Team ID is required' }, { status: 400 });
+        }
+
+        const supabase = getSupabaseAdmin();
+        const { data: user } = await supabase
+            .from('users')
+            .select('id')
+            .eq('email', session.user.email)
+            .single();
+
+        if (!user) {
+            return NextResponse.json({ error: 'User not found' }, { status: 404 });
+        }
+
+        const { data: membership } = await supabase
+            .from('team_members')
+            .select('role')
+            .eq('team_id', id)
+            .eq('user_id', user.id)
+            .single();
+
+        if (!membership || membership.role !== 'admin') {
+            return NextResponse.json({ error: 'Only admins can delete teams' }, { status: 403 });
+        }
+
+        const { error } = await supabase.from('teams').delete().eq('id', id);
+
+        if (error) {
+            return NextResponse.json({ error: error.message }, { status: 500 });
+        }
+
+        return NextResponse.json({ success: true });
+    } catch (error) {
+        console.error('Delete team error:', error);
+        return NextResponse.json({ error: 'Internal server error' }, { status: 500 });
+    }
+}

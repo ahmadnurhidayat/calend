@@ -51,7 +51,7 @@ export async function createCalendarEvent(
         if (event.addVideoLink) {
             requestBody.conferenceData = {
                 createRequest: {
-                    requestId: `${Date.now()}-${Math.random().toString(36).slice(2)}`,
+                    requestId: `${Date.now()}-${crypto.randomUUID().replace(/-/g, '').substring(0, 8)}`,
                     conferenceSolutionKey: { type: 'hangoutsMeet' },
                 },
             };

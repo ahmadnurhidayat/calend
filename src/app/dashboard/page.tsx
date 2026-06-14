@@ -3,7 +3,7 @@
 import { useSession } from 'next-auth/react';
 import { useRouter } from 'next/navigation';
 import { useEffect, useState, useCallback, useMemo } from 'react';
-import { getSupabase, Availability, Booking } from '@/lib/supabase';
+import { Availability, Booking } from '@/lib/supabase';
 
 const dayNames = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'];
 
@@ -134,26 +134,23 @@ export default function DashboardPage() {
 
             setUsername(user.username);
 
-            const supabase = getSupabase();
+            const [bookingsRes, availRes] = await Promise.all([
+                fetch('/api/bookings'),
+                fetch('/api/availability'),
+            ]);
 
-            const { data: bookingsData } = await supabase
-                .from('bookings')
-                .select('*')
-                .eq('user_id', user.id)
-                .order('date', { ascending: true });
-
-            if (bookingsData) {
-                setBookings(bookingsData);
+            if (bookingsRes.ok) {
+                const { bookings: bookingsData } = await bookingsRes.json() as { bookings: Booking[] };
+                if (bookingsData) {
+                    setBookings(bookingsData);
+                }
             }
 
-            const { data: availData } = await supabase
-                .from('availability')
-                .select('*')
-                .eq('user_id', user.id)
-                .order('day_of_week', { ascending: true });
-
-            if (availData) {
-                setAvailability(availData);
+            if (availRes.ok) {
+                const { availability: availData } = await availRes.json() as { availability: Availability[] };
+                if (availData) {
+                    setAvailability(availData);
+                }
             }
         } catch {
             // silent fail

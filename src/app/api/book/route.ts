@@ -294,8 +294,8 @@ export async function POST(request: NextRequest) {
             .single();
 
         if (error) {
-            console.error('Database error:', JSON.stringify(error));
-            return NextResponse.json({ error: 'Failed to save booking', details: error.message, code: error.code }, { status: 500 });
+            console.error('Database error:', error);
+            return NextResponse.json({ error: 'Failed to save booking' }, { status: 500 });
         }
 
         // Send emails

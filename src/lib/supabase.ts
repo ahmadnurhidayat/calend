@@ -1,16 +1,18 @@
 import { createClient, SupabaseClient } from '@supabase/supabase-js';
-import { env } from './env';
 
 let cachedClient: SupabaseClient | null = null;
 
 export function getSupabase(): SupabaseClient {
     if (cachedClient) return cachedClient;
 
-    if (!env.supabaseUrl || !env.supabaseAnonKey) {
-        throw new Error('Missing SUPABASE_URL or SUPABASE_ANON_KEY');
+    const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL || '';
+    const supabaseAnonKey = process.env.NEXT_PUBLIC_SUPABASE_PUBLISHABLE_DEFAULT_KEY || '';
+
+    if (!supabaseUrl || !supabaseAnonKey) {
+        throw new Error('Missing NEXT_PUBLIC_SUPABASE_URL or NEXT_PUBLIC_SUPABASE_PUBLISHABLE_DEFAULT_KEY');
     }
 
-    cachedClient = createClient(env.supabaseUrl, env.supabaseAnonKey);
+    cachedClient = createClient(supabaseUrl, supabaseAnonKey);
     return cachedClient;
 }
 

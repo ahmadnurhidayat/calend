@@ -48,7 +48,8 @@ export async function POST(request: NextRequest) {
         }
 
         // Generate username from email
-        const username = email.split('@')[0].replace(/[^a-zA-Z0-9]/g, '') + Math.random().toString(36).substring(2, 6);
+        const suffix = crypto.randomUUID().replace(/-/g, '').substring(0, 4);
+        const username = email.split('@')[0].replace(/[^a-zA-Z0-9]/g, '') + suffix;
 
         const { error } = await supabase.from('users').insert({
             email,

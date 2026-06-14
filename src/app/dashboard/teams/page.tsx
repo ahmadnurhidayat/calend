@@ -331,7 +331,7 @@ export default function TeamsPage() {
                                             Add Member
                                         </button>
                                         <a
-                                            href={`/book/team/${selectedTeam.slug}`}
+                                            href={`/book/team/${encodeURIComponent(selectedTeam.slug)}`}
                                             target="_blank"
                                             rel="noopener noreferrer"
                                             className="text-primary hover:underline text-sm"

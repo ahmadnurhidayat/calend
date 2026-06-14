@@ -2,7 +2,7 @@
 
 import { useSession } from 'next-auth/react';
 import { useRouter } from 'next/navigation';
-import { useEffect, useState, useCallback } from 'react';
+import { useEffect, useState, useCallback, useMemo } from 'react';
 import { getSupabase, Availability, Booking } from '@/lib/supabase';
 
 const dayNames = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'];
@@ -119,23 +119,23 @@ export default function DashboardPage() {
     const [rescheduleLoading, setRescheduleLoading] = useState(false);
     const [rescheduleError, setRescheduleError] = useState('');
 
-    const bookingLink = typeof window !== 'undefined'
-        ? `${window.location.origin}/book/${username}`
-        : '';
+    const bookingLink = useMemo(() => {
+        if (typeof window === 'undefined') return '';
+        return username ? `${window.location.origin}/book/${username}` : '';
+    }, [username]);
 
     const loadUserData = useCallback(async () => {
-        const supabase = getSupabase();
-        const { data: user } = await supabase
-            .from('users')
-            .select('id, username')
-            .eq('email', session?.user?.email)
-            .single();
+        try {
+            const userRes = await fetch('/api/user/me');
+            if (!userRes.ok) return;
 
-        if (user) {
+            const { user } = await userRes.json() as { user: { id: string; username: string } };
+            if (!user) return;
+
             setUsername(user.username);
-        }
 
-        if (user?.id) {
+            const supabase = getSupabase();
+
             const { data: bookingsData } = await supabase
                 .from('bookings')
                 .select('*')
@@ -155,8 +155,10 @@ export default function DashboardPage() {
             if (availData) {
                 setAvailability(availData);
             }
+        } catch {
+            // silent fail
         }
-    }, [session?.user?.email]);
+    }, []);
 
     useEffect(() => {
         if (status === 'unauthenticated') {
